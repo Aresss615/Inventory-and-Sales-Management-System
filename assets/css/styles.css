@@ -30,7 +30,6 @@ body {
     height: 100vh;
 }
 
-/* Sidebar */
 .sidebar {
     width: 260px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
@@ -87,7 +86,12 @@ body {
     text-align: center;
 }
 
-/* Main Content */
+.sidebar-footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
 .main {
     flex: 1;
     display: flex;
@@ -163,7 +167,6 @@ body {
     font-weight: 600;
 }
 
-/* Content Area */
 .content {
     flex: 1;
     overflow-y: auto;
@@ -189,7 +192,6 @@ body {
     to { transform: translateX(0); opacity: 1; }
 }
 
-/* Dashboard */
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -273,7 +275,6 @@ body {
     height: 300px;
 }
 
-/* Inventory Table */
 .controls {
     display: flex;
     gap: 15px;
@@ -490,7 +491,6 @@ tbody tr:hover {
     margin-bottom: 20px;
 }
 
-/* Modal Styles */
 .modal {
     display: none;
     position: fixed;
@@ -594,7 +594,6 @@ tbody tr:hover {
     background: white;
 }
 
-/* Action buttons in table */
 .action-buttons {
     display: flex;
     gap: 8px;
@@ -619,7 +618,6 @@ tbody tr:hover {
     transform: translateY(-2px);
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
     .charts-grid {
         grid-template-columns: 1fr;
