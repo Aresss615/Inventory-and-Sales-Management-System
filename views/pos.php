@@ -83,13 +83,11 @@ function renderCart() {
     const cartItems = document.getElementById('cartItems');
     const cartTotal = document.getElementById('cartTotal');
     const checkoutBtn = document.getElementById('checkoutBtn');
-    const cartData = document.getElementById('cartData');
     
     if (cart.length === 0) {
         cartItems.innerHTML = '<div class="pos-empty">Cart is empty</div>';
         cartTotal.textContent = '₱0.00';
         checkoutBtn.disabled = true;
-        cartData.value = '';
         return;
     }
     
