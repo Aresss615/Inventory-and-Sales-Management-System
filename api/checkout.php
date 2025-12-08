@@ -34,6 +34,25 @@ $success_count = 0;
 mysqli_begin_transaction($conn);
 
 try {
+    $transaction_number = 'TXN-' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
+    
+    $total_amount = 0;
+    $total_items = 0;
+    foreach ($data['items'] as $item) {
+        $total_amount += $item['qty'] * $item['price'];
+        $total_items += $item['qty'];
+    }
+    
+    $trans_query = "INSERT INTO transactions (transaction_number, total_amount, total_items, sold_by) 
+                    VALUES ('$transaction_number', '$total_amount', '$total_items', " . 
+                    ($sold_by ? "'$sold_by'" : "NULL") . ")";
+    
+    if (!mysqli_query($conn, $trans_query)) {
+        throw new Exception('Failed to create transaction record');
+    }
+    
+    $transaction_id = mysqli_insert_id($conn);
+    
     foreach ($data['items'] as $item) {
         if (empty($item['product_id']) || empty($item['qty']) || !isset($item['price'])) {
             throw new Exception('Invalid item data');
@@ -60,8 +79,8 @@ try {
         $category_id = $product['category_id'];
         $total = $qty * $price;
         
-        $query = "INSERT INTO sales (product_id, product_name, qty, price, total, category_id, sale_date, sold_by) 
-                  VALUES ('$product_id', '$product_name', '$qty', '$price', '$total', '$category_id', '$sale_date', " . 
+        $query = "INSERT INTO sales (transaction_id, product_id, product_name, qty, price, total, category_id, sale_date, sold_by) 
+                  VALUES ('$transaction_id', '$product_id', '$product_name', '$qty', '$price', '$total', '$category_id', '$sale_date', " . 
                   ($sold_by ? "'$sold_by'" : "NULL") . ")";
         
         if (!mysqli_query($conn, $query)) {
@@ -78,10 +97,17 @@ try {
     
     mysqli_commit($conn);
     
+    $_SESSION['notification'] = [
+        'message' => 'Sale completed successfully! Transaction: ' . $transaction_number . ' - ' . $success_count . ' item(s) processed.',
+        'type' => 'success'
+    ];
+    
     http_response_code(200);
     echo json_encode([
         'status' => 200,
         'message' => 'Sale completed successfully',
+        'transaction_number' => $transaction_number,
+        'transaction_id' => $transaction_id,
         'items_processed' => $success_count
     ]);
 } catch (Exception $e) {
