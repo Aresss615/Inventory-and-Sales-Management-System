@@ -8,9 +8,9 @@ checkLogin();
 
 $current_user = getCurrentUser();
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$category = isset($_GET['category']) ? $_GET['category'] : '';
-$stock = isset($_GET['stock']) ? $_GET['stock'] : '';
+$search = isset($_GET['search']) && $_GET['search'] !== '' ? $_GET['search'] : '';
+$category = isset($_GET['category']) && $_GET['category'] !== '' ? $_GET['category'] : '';
+$stock = isset($_GET['stock']) && $_GET['stock'] !== '' ? $_GET['stock'] : '';
 
 $categories = [];
 $cat_result = mysqli_query($conn, "SELECT * FROM categories ORDER BY name ASC");
@@ -25,17 +25,21 @@ if ($result) {
 }
 
 $filtered_products = $products;
-if ($search || $category || $stock) {
+if ($search !== '' || $category !== '' || $stock !== '') {
     $filtered_products = array_filter($products, function($item) use ($search, $category, $stock) {
-        $matchSearch = empty($search) || 
+        $matchSearch = $search === '' || 
                       stripos($item['name'], $search) !== false || 
                       stripos($item['sku'], $search) !== false || 
                       stripos($item['barcode'], $search) !== false;
-        $matchCategory = empty($category) || $item['category_id'] == $category;
+        $matchCategory = $category === '' || $item['category_id'] == $category;
         $matchStock = true;
-        if ($stock === 'in-stock') $matchStock = $item['stock'] > $item['minStock'];
-        else if ($stock === 'low-stock') $matchStock = $item['stock'] > 0 && $item['stock'] <= $item['minStock'];
-        else if ($stock === 'out-stock') $matchStock = $item['stock'] == 0;
+        if ($stock === 'in-stock') {
+            $matchStock = $item['stock'] > $item['minStock'];
+        } elseif ($stock === 'low-stock') {
+            $matchStock = $item['stock'] > 0 && $item['stock'] <= $item['minStock'];
+        } elseif ($stock === 'out-stock') {
+            $matchStock = $item['stock'] == 0;
+        }
         return $matchSearch && $matchCategory && $matchStock;
     });
 }
@@ -64,7 +68,7 @@ usort($topProducts, function($a, $b) {
 $topProducts = array_slice($topProducts, 0, 4);
 
 $salesData = [];
-$sales_result = mysqli_query($conn, "SELECT s.*, p.name as product_name FROM sales s LEFT JOIN products p ON s.product_id = p.id ORDER BY s.sale_date DESC LIMIT 100");
+$sales_result = mysqli_query($conn, "SELECT s.*, s.qty as quantity, p.name as product_name, u.username as sold_by_username FROM sales s LEFT JOIN products p ON s.product_id = p.id LEFT JOIN users u ON s.sold_by = u.id ORDER BY s.created_at DESC LIMIT 100");
 if ($sales_result) {
     $salesData = mysqli_fetch_all($sales_result, MYSQLI_ASSOC);
 }
@@ -113,6 +117,12 @@ if ($sales_sum_result) {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="?page=pos" class="nav-link <?php echo $page === 'pos' ? 'active' : ''; ?>">
+                        <i class="fas fa-cash-register"></i>
+                        <span>POS</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="?page=reports" class="nav-link <?php echo $page === 'reports' ? 'active' : ''; ?>">
                         <i class="fas fa-chart-bar"></i>
                         <span>Sales Reports</span>
@@ -151,6 +161,7 @@ if ($sales_sum_result) {
                         'dashboard' => 'Dashboard',
                         'inventory' => 'Inventory Management',
                         'scanner' => 'Barcode Scanner',
+                        'pos' => 'Point of Sale',
                         'reports' => 'Sales Reports',
                         'categories' => 'Category Management',
                         'users' => 'User Management'
@@ -175,6 +186,8 @@ if ($sales_sum_result) {
                     <?php include 'views/inventory.php'; ?>
                 <?php elseif ($page === 'scanner'): ?>
                     <?php include 'views/scanner.php'; ?>
+                <?php elseif ($page === 'pos'): ?>
+                    <?php include 'views/pos.php'; ?>
                 <?php elseif ($page === 'reports'): ?>
                     <?php include 'views/reports.php'; ?>
                 <?php elseif ($page === 'categories' && in_array($current_user['role'], ['admin', 'manager'])): ?>
