@@ -26,20 +26,51 @@ function initCharts() {
         plugins: {
             legend: {
                 labels: {
-                    font: { size: 12, family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
-                    color: '#64748b'
+                    font: { size: 12, family: "-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif", weight: '500' },
+                    color: '#64748b',
+                    padding: 12,
+                    usePointStyle: true,
+                    pointStyle: 'circle'
                 }
             }
         },
         scales: {
             y: {
                 beginAtZero: true,
-                grid: { color: '#e2e8f0', drawBorder: false },
-                ticks: { color: '#64748b', font: { size: 11 } }
+                grid: { 
+                    color: '#f3f4f6', 
+                    drawBorder: false,
+                    lineWidth: 1
+                },
+                ticks: { 
+                    color: '#94a3b8', 
+                    font: { size: 11, weight: '500' },
+                    padding: 8
+                }
             },
             x: {
                 grid: { display: false },
-                ticks: { color: '#64748b', font: { size: 11 } }
+                ticks: { 
+                    color: '#94a3b8', 
+                    font: { size: 11, weight: '500' },
+                    padding: 8
+                }
+            }
+        },
+        elements: {
+            line: {
+                borderWidth: 2,
+                tension: 0.4
+            },
+            point: {
+                radius: 4,
+                hoverRadius: 6,
+                borderWidth: 2,
+                backgroundColor: '#ffffff'
+            },
+            bar: {
+                borderRadius: 8,
+                borderSkipped: false
             }
         }
     };
@@ -58,7 +89,15 @@ function initCharts() {
         charts.categorySales = new Chart(document.getElementById('categorySalesChart'), {
             type: 'doughnut',
             data: window.categorySalesData,
-            options: chartConfig
+            options: {
+                ...chartConfig,
+                elements: {
+                    arc: {
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }
+                }
+            }
         });
     }
 
@@ -94,7 +133,15 @@ function initCharts() {
         charts.reportPie = new Chart(document.getElementById('reportPieChart'), {
             type: 'pie',
             data: window.reportPieData,
-            options: chartConfig
+            options: {
+                ...chartConfig,
+                elements: {
+                    arc: {
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }
+                }
+            }
         });
     }
 }
