@@ -8,9 +8,9 @@ checkLogin();
 
 $current_user = getCurrentUser();
 $page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$category = isset($_GET['category']) ? $_GET['category'] : '';
-$stock = isset($_GET['stock']) ? $_GET['stock'] : '';
+$search = isset($_GET['search']) && $_GET['search'] !== '' ? $_GET['search'] : '';
+$category = isset($_GET['category']) && $_GET['category'] !== '' ? $_GET['category'] : '';
+$stock = isset($_GET['stock']) && $_GET['stock'] !== '' ? $_GET['stock'] : '';
 
 $categories = [];
 $cat_result = mysqli_query($conn, "SELECT * FROM categories ORDER BY name ASC");
@@ -25,17 +25,21 @@ if ($result) {
 }
 
 $filtered_products = $products;
-if ($search || $category || $stock) {
+if ($search !== '' || $category !== '' || $stock !== '') {
     $filtered_products = array_filter($products, function($item) use ($search, $category, $stock) {
-        $matchSearch = empty($search) || 
+        $matchSearch = $search === '' || 
                       stripos($item['name'], $search) !== false || 
                       stripos($item['sku'], $search) !== false || 
                       stripos($item['barcode'], $search) !== false;
-        $matchCategory = empty($category) || $item['category_id'] == $category;
+        $matchCategory = $category === '' || $item['category_id'] == $category;
         $matchStock = true;
-        if ($stock === 'in-stock') $matchStock = $item['stock'] > $item['minStock'];
-        else if ($stock === 'low-stock') $matchStock = $item['stock'] > 0 && $item['stock'] <= $item['minStock'];
-        else if ($stock === 'out-stock') $matchStock = $item['stock'] == 0;
+        if ($stock === 'in-stock') {
+            $matchStock = $item['stock'] > $item['minStock'];
+        } elseif ($stock === 'low-stock') {
+            $matchStock = $item['stock'] > 0 && $item['stock'] <= $item['minStock'];
+        } elseif ($stock === 'out-stock') {
+            $matchStock = $item['stock'] == 0;
+        }
         return $matchSearch && $matchCategory && $matchStock;
     });
 }
