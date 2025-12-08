@@ -240,7 +240,7 @@ function deleteProduct($id)
 function getSales()
 {
     global $conn;
-    $query = "SELECT s.*, c.name as category_name, u.username as sold_by_username 
+    $query = "SELECT s.*, s.qty as quantity, c.name as category_name, u.username as sold_by_username 
               FROM sales s 
               LEFT JOIN categories c ON s.category_id = c.id 
               LEFT JOIN users u ON s.sold_by = u.id 
