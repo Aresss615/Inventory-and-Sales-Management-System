@@ -1,20 +1,54 @@
-CREATE DATABASE IF NOT EXISTS invsys;
+DROP DATABASE IF EXISTS invsys;
+
+CREATE DATABASE invsys;
 
 USE invsys;
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE roles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    display_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    is_system TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE permissions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    display_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    module VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE role_permissions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    role_id INT NOT NULL,
+    permission_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_role_permission (role_id, permission_id)
+);
+
+CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     full_name VARCHAR(100) NOT NULL,
-    role ENUM('admin', 'manager', 'staff') NOT NULL DEFAULT 'staff',
+    role_id INT NOT NULL,
     is_active TINYINT(1) DEFAULT 1,
+    created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS categories (
+CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
@@ -22,7 +56,7 @@ CREATE TABLE IF NOT EXISTS categories (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS products (
+CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sku VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
@@ -38,8 +72,19 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS sales (
+CREATE TABLE transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_number VARCHAR(50) NOT NULL UNIQUE,
+    total_amount DECIMAL(10, 2) NOT NULL,
+    total_items INT NOT NULL,
+    sold_by INT,
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sold_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE sales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    transaction_id INT NOT NULL,
     product_id INT NOT NULL,
     product_name VARCHAR(255) NOT NULL,
     qty INT NOT NULL,
@@ -49,15 +94,80 @@ CREATE TABLE IF NOT EXISTS sales (
     sale_date DATE NOT NULL,
     sold_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
     FOREIGN KEY (sold_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-INSERT INTO users (username, password, email, full_name, role) VALUES
-('admin', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'admin@invsys.com', 'System Administrator', 'admin'),
-('manager', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'manager@invsys.com', 'Store Manager', 'manager'),
-('staff', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'staff@invsys.com', 'Staff Member', 'staff');
+INSERT INTO roles (name, display_name, description, is_system) VALUES
+('admin', 'Administrator', 'Full system access with all permissions', 1),
+('manager', 'Manager', 'Can manage staff and oversee operations', 1),
+('cashier', 'Cashier', 'Can process sales and view inventory', 0),
+('stock_manager', 'Stock Manager', 'Can manage inventory and products', 0);
+
+INSERT INTO permissions (name, display_name, description, module) VALUES
+('users_view', 'View Users', 'Can view user list', 'users'),
+('users_create', 'Create Users', 'Can create new users', 'users'),
+('users_edit', 'Edit Users', 'Can edit user details', 'users'),
+('users_delete', 'Delete Users', 'Can delete users', 'users'),
+('roles_view', 'View Roles', 'Can view role list', 'roles'),
+('roles_create', 'Create Roles', 'Can create new roles', 'roles'),
+('roles_edit', 'Edit Roles', 'Can edit role details and permissions', 'roles'),
+('roles_delete', 'Delete Roles', 'Can delete roles', 'roles'),
+('products_view', 'View Products', 'Can view product list', 'products'),
+('products_create', 'Create Products', 'Can create new products', 'products'),
+('products_edit', 'Edit Products', 'Can edit product details', 'products'),
+('products_delete', 'Delete Products', 'Can delete products', 'products'),
+('categories_view', 'View Categories', 'Can view category list', 'categories'),
+('categories_create', 'Create Categories', 'Can create new categories', 'categories'),
+('categories_edit', 'Edit Categories', 'Can edit category details', 'categories'),
+('categories_delete', 'Delete Categories', 'Can delete categories', 'categories'),
+('sales_view', 'View Sales', 'Can view sales records', 'sales'),
+('sales_create', 'Create Sales', 'Can create sales records', 'sales'),
+('sales_delete', 'Delete Sales', 'Can delete sales records', 'sales'),
+('reports_view', 'View Reports', 'Can view sales and inventory reports', 'reports'),
+('reports_export', 'Export Reports', 'Can export reports', 'reports'),
+('inventory_view', 'View Inventory', 'Can view inventory levels', 'inventory'),
+('inventory_manage', 'Manage Inventory', 'Can adjust stock levels', 'inventory'),
+('dashboard_view', 'View Dashboard', 'Can view dashboard', 'dashboard');
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 1, id FROM permissions;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 2, id FROM permissions WHERE name IN (
+    'users_view', 'users_create', 'users_edit',
+    'products_view', 'products_create', 'products_edit', 'products_delete',
+    'categories_view', 'categories_create', 'categories_edit', 'categories_delete',
+    'sales_view', 'sales_create', 'sales_delete',
+    'reports_view', 'reports_export',
+    'inventory_view', 'inventory_manage',
+    'dashboard_view'
+);
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 3, id FROM permissions WHERE name IN (
+    'products_view',
+    'sales_view', 'sales_create',
+    'inventory_view',
+    'dashboard_view'
+);
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 4, id FROM permissions WHERE name IN (
+    'products_view', 'products_create', 'products_edit',
+    'categories_view', 'categories_create', 'categories_edit',
+    'sales_view',
+    'inventory_view', 'inventory_manage',
+    'dashboard_view'
+);
+
+INSERT INTO users (username, password, email, full_name, role_id, created_by) VALUES
+('admin', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'admin@invsys.com', 'System Administrator', 1, NULL),
+('manager', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'manager@invsys.com', 'Store Manager', 2, 1),
+('cashier', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'cashier@invsys.com', 'Cashier', 3, 1),
+('stock', '$2y$10$Ju84KdnU.2WqnP2VHqtJHei9WytParY0TezXKfQBhrW9N0Kedg7aG', 'stock@invsys.com', 'Stock Manager', 4, 1);
 
 INSERT INTO categories (name, description) VALUES
 ('Electronics', 'Electronic devices and accessories'),
@@ -67,7 +177,11 @@ INSERT INTO categories (name, description) VALUES
 ('Food & Beverages', 'Food items and drinks'),
 ('Health & Beauty', 'Personal care and cosmetics'),
 ('Books & Stationery', 'Reading materials and office supplies'),
-('Toys & Hobbies', 'Toys and hobby items');
+('Toys & Hobbies', 'Toys and hobby items'),
+('Automotive', 'Car accessories and maintenance products'),
+('Pet Supplies', 'Pet food and accessories'),
+('Garden & Tools', 'Gardening equipment and hand tools'),
+('Music & Instruments', 'Musical instruments and audio equipment');
 
 INSERT INTO products (sku, name, barcode, category_id, stock, price, minStock, created_by) VALUES
 ('ELEC-001', 'Samsung Galaxy A54 5G', '8801643990009', 1, 25, 22990.00, 5, 1),
@@ -133,49 +247,193 @@ INSERT INTO products (sku, name, barcode, category_id, stock, price, minStock, c
 ('TOYS-005', 'Play-Doh 8-Pack Rainbow', '5010993695478', 8, 45, 495.00, 15, 2),
 ('TOYS-006', 'Rubik\'s Cube 3x3 Original', '0778988403914', 8, 55, 595.00, 18, 2),
 ('TOYS-007', 'UNO Card Game', '0746775036430', 8, 60, 349.00, 20, 2),
-('TOYS-008', 'Tamiya Mini 4WD Starter Pack', '4950344957422', 8, 28, 1295.00, 10, 2);
+('TOYS-008', 'Tamiya Mini 4WD Starter Pack', '4950344957422', 8, 28, 1295.00, 10, 2),
+('ELEC-009', 'Samsung Galaxy Buds2 Pro', '8806094301205', 1, 28, 9995.00, 8, 1),
+('ELEC-010', 'Dell P2422H 24" Monitor', '0884116395775', 1, 15, 12995.00, 5, 1),
+('ELEC-011', 'Razer DeathAdder V3 Gaming Mouse', '8886419382256', 1, 32, 3995.00, 10, 1),
+('ELEC-012', 'Anker PowerCore 20000mAh', '0194644076733', 1, 45, 1895.00, 15, 1),
+('ELEC-013', 'Lenovo IdeaPad Slim 3', '0196801597709', 1, 10, 29995.00, 3, 1),
+('ELEC-014', 'Canon EOS M50 Mark II', '4549292179583', 1, 8, 45995.00, 2, 1),
+('ELEC-015', 'TP-Link WiFi 6 Router', '4897098685662', 1, 22, 3495.00, 8, 1),
+('CLTH-009', 'Zara Slim Fit Chinos', '8445931234567', 2, 55, 2495.00, 18, 1),
+('CLTH-010', 'Champion Classic Sweatshirt', '0738282704689', 2, 38, 2295.00, 12, 1),
+('CLTH-011', 'Converse Chuck Taylor All Star', '0194433874779', 2, 42, 3295.00, 14, 1),
+('CLTH-012', 'Gap Basic Crew Neck Sweater', '0195433218765', 2, 48, 1895.00, 16, 1),
+('CLTH-013', 'Lacoste Classic Polo Shirt', '3614037876543', 2, 35, 4995.00, 10, 1),
+('CLTH-014', 'Vans Old Skool Black/White', '0196013037652', 2, 50, 3795.00, 15, 1),
+('HOME-009', 'Instant Pot Duo 7-in-1', '0817668022390', 3, 14, 6495.00, 5, 1),
+('HOME-010', 'Panasonic Microwave 25L', '0885170258556', 3, 18, 4995.00, 6, 1),
+('HOME-011', 'Bissell Carpet Cleaner', '0011120224207', 3, 10, 8995.00, 3, 1),
+('HOME-012', 'Black+Decker Toaster Oven', '0050875814035', 3, 20, 3295.00, 8, 1),
+('HOME-013', 'Rubbermaid Storage Bins Set', '0071691454847', 3, 42, 1295.00, 15, 1),
+('HOME-014', 'Umbra Picture Frames Set', '0028295782456', 3, 35, 895.00, 12, 1),
+('SPRT-009', 'Under Armour Compression Shirt', '0196040190234', 4, 45, 2195.00, 15, 1),
+('SPRT-010', 'Puma Running Shorts', '4063699532876', 4, 52, 1595.00, 18, 1),
+('SPRT-011', 'Garmin Forerunner 55', '0753759260682', 4, 12, 10995.00, 4, 1),
+('SPRT-012', 'Liforme Yoga Mat Pro', '5060434451234', 4, 18, 6995.00, 6, 1),
+('SPRT-013', 'Bowflex Adjustable Dumbbells', '0817354014567', 4, 8, 24995.00, 2, 1),
+('SPRT-014', 'Yonex Badminton Racket', '0476192345678', 4, 25, 2895.00, 8, 1),
+('FOOD-009', 'Milo Activ-Go 1kg', '4800361349048', 5, 95, 295.00, 30, 2),
+('FOOD-010', 'San Miguel Beer Pale Pilsen 330ml (6-pack)', '4800888100012', 5, 120, 285.00, 40, 2),
+('FOOD-011', 'Spam Classic 340g', '0037600104494', 5, 85, 185.00, 28, 2),
+('FOOD-012', 'Nutella Hazelnut Spread 350g', '8000500217023', 5, 75, 215.00, 25, 2),
+('FOOD-013', 'Kellogg\'s Corn Flakes 500g', '5053827171090', 5, 68, 245.00, 22, 2),
+('FOOD-014', 'Maggi Magic Sarap 50g', '4800361336543', 5, 150, 32.00, 50, 2),
+('FOOD-015', 'Tropicana Orange Juice 1L', '0048500023907', 5, 88, 125.00, 30, 2),
+('FOOD-016', 'Oreo Cookies Original 133g', '0044000048976', 5, 110, 65.00, 35, 2),
+('HLTH-009', 'Ponds White Beauty Cream 50g', '8851932334891', 6, 62, 189.00, 20, 2),
+('HLTH-010', 'Head & Shoulders Shampoo 340ml', '4902430874731', 6, 72, 245.00, 24, 2),
+('HLTH-011', 'Oral-B Pro-Health Toothbrush', '0300410103644', 6, 85, 95.00, 28, 2),
+('HLTH-012', 'Johnson\'s Baby Powder 500g', '8901012345678', 6, 58, 175.00, 20, 2),
+('HLTH-013', 'Garnier Micellar Water 400ml', '3600542078634', 6, 48, 395.00, 16, 2),
+('HLTH-014', 'Vaseline Petroleum Jelly 100ml', '8850987654321', 6, 95, 125.00, 32, 2),
+('BOOK-009', 'Casio Scientific Calculator FX-991ES', '4971850181255', 7, 38, 895.00, 12, 2),
+('BOOK-010', 'Faber-Castell Pencil Case', '4005401235689', 7, 55, 195.00, 18, 2),
+('BOOK-011', 'Staedtler Eraser Mars Plastic', '4007817525227', 7, 120, 35.00, 40, 2),
+('BOOK-012', 'Scotch Magic Tape', '0051141275512', 7, 88, 125.00, 30, 2),
+('BOOK-013', 'Moleskine Classic Notebook', '8058341715734', 7, 32, 795.00, 10, 2),
+('BOOK-014', 'Sharpie Permanent Markers 12-pack', '0071641153943', 7, 45, 425.00, 15, 2),
+('TOYS-009', 'Monopoly Classic Board Game', '5010993702466', 8, 28, 1895.00, 10, 2),
+('TOYS-010', 'Jenga Classic Game', '0630509862160', 8, 42, 895.00, 15, 2),
+('TOYS-011', 'Fisher-Price Baby Walker', '0887961872651', 8, 15, 2495.00, 5, 2),
+('TOYS-012', 'Crayola Crayon Box 64-count', '0071662078645', 8, 58, 595.00, 20, 2),
+('TOYS-013', 'Transformers Optimus Prime', '5010993685035', 8, 22, 1695.00, 8, 2),
+('TOYS-014', 'Funko Pop! Marvel Spider-Man', '0889698452342', 8, 48, 795.00, 16, 2),
+('AUTO-001', 'Castrol GTX 10W-40 Engine Oil 1L', '4260041011632', 9, 85, 495.00, 28, 1),
+('AUTO-002', 'Bosch Wiper Blades 22"', '3165140998567', 9, 45, 895.00, 15, 1),
+('AUTO-003', 'Turtle Wax Car Shampoo 1L', '0070066782344', 9, 62, 345.00, 20, 1),
+('AUTO-004', 'Michelin Air Compressor', '3528700000017', 9, 18, 2495.00, 6, 1),
+('AUTO-005', 'Armor All Dashboard Cleaner', '0070612402349', 9, 72, 295.00, 24, 1),
+('AUTO-006', 'Car First Aid Kit', '0885909876543', 9, 38, 595.00, 12, 1),
+('PET-001', 'Pedigree Adult Dog Food 1.5kg', '0023100012345', 10, 55, 385.00, 18, 2),
+('PET-002', 'Whiskas Cat Food Pouch 85g (12-pack)', '0050000554877', 10, 48, 295.00, 16, 2),
+('PET-003', 'Flexi Retractable Dog Leash', '4000498073230', 10, 32, 1295.00, 10, 2),
+('PET-004', 'Pet Carrier Bag Medium', '0812345098765', 10, 22, 895.00, 8, 2),
+('PET-005', 'Cat Litter Breeder\'s Choice 15L', '9345678901234', 10, 28, 695.00, 10, 2),
+('PET-006', 'Kong Classic Dog Toy', '0035585101019', 10, 65, 495.00, 22, 2),
+('GARD-001', 'Black & Decker Cordless Drill', '0885911432109', 11, 15, 3495.00, 5, 1),
+('GARD-002', 'Stanley Toolbox 19"', '0076174499940', 11, 25, 1295.00, 8, 1),
+('GARD-003', 'Gardena Garden Hose 20m', '4078500401234', 11, 18, 1895.00, 6, 1),
+('GARD-004', 'Fiskars Pruning Shears', '0046561234567', 11, 35, 795.00, 12, 1),
+('GARD-005', 'Miracle-Gro Plant Food', '0073561002349', 11, 48, 395.00, 16, 1),
+('GARD-006', 'Scotts Lawn Fertilizer 5kg', '0032247098765', 11, 32, 895.00, 10, 1),
+('MUSC-001', 'Yamaha C40 Classical Guitar', '0086792947327', 12, 12, 8995.00, 4, 1),
+('MUSC-002', 'Roland FP-10 Digital Piano', '0761294513828', 12, 5, 29995.00, 2, 1),
+('MUSC-003', 'Shure SM58 Microphone', '0042406051507', 12, 18, 5495.00, 6, 1),
+('MUSC-004', 'Audio-Technica ATH-M50x Headphones', '4961310141752', 12, 22, 8995.00, 8, 1),
+('MUSC-005', 'Korg Tuner CA-50', '4959112177413', 12, 42, 795.00, 14, 1),
+('MUSC-006', 'D\'Addario Guitar Strings EXL110', '0019954910266', 12, 65, 495.00, 22, 1);
 
 INSERT INTO sales (product_id, product_name, qty, price, total, category_id, sale_date, sold_by) VALUES
-(3, 'JBL Flip 6 Bluetooth Speaker', 2, 6495.00, 12990.00, 1, '2025-11-01', 3),
-(10, 'Nike Air Force 1 Sneakers', 2, 5495.00, 10990.00, 2, '2025-11-03', 3),
-(11, 'Uniqlo AIRism Cotton T-Shirt', 5, 590.00, 2950.00, 2, '2025-11-03', 2),
-(15, 'Bench Plain Basic Tee', 8, 399.00, 3192.00, 2, '2025-11-04', 3),
-(41, 'Cetaphil Gentle Skin Cleanser 500ml', 2, 895.00, 1790.00, 6, '2025-11-05', 2),
-(45, 'Belo Essentials Whitening Lotion 200ml', 3, 245.00, 735.00, 6, '2025-11-05', 3),
-(1, 'Samsung Galaxy A54 5G', 1, 22990.00, 22990.00, 1, '2025-11-06', 2),
-(5, 'Xiaomi Redmi Note 12 Pro', 2, 13999.00, 27998.00, 1, '2025-11-06', 3),
-(25, 'Nike Pro Dri-FIT Training Shirt', 4, 1895.00, 7580.00, 4, '2025-11-07', 3),
-(27, 'Yoga Mat 6mm Non-Slip', 3, 895.00, 2685.00, 4, '2025-11-07', 2),
-(37, 'Pringles Original 110g', 6, 89.00, 534.00, 5, '2025-11-08', 3),
-(38, 'C2 Green Tea Apple 1L', 10, 42.00, 420.00, 5, '2025-11-08', 3),
-(49, 'Mongol Pencil No. 2 (Box of 12)', 8, 89.00, 712.00, 7, '2025-11-09', 2),
-(51, 'Pilot G-Tec C4 Pen Black (12s)', 4, 399.00, 1596.00, 7, '2025-11-09', 3),
-(57, 'LEGO Classic Creative Box', 2, 2495.00, 4990.00, 8, '2025-11-10', 2),
-(60, 'Nerf Elite 2.0 Blaster', 1, 1895.00, 1895.00, 8, '2025-11-10', 3),
-(19, 'Philips Air Fryer XXL', 2, 7995.00, 15990.00, 3, '2025-11-11', 2),
-(20, 'Tefal Rice Cooker 1.8L', 3, 2495.00, 7485.00, 3, '2025-11-11', 3),
-(8, 'Logitech MX Master 3S Mouse', 2, 5495.00, 10990.00, 1, '2025-11-12', 2),
-(12, 'Adidas Originals Hoodie', 3, 3295.00, 9885.00, 2, '2025-11-13', 3),
-(28, 'Spalding NBA Basketball', 2, 1695.00, 3390.00, 4, '2025-11-14', 2),
-(44, 'Colgate Total Toothpaste 150g', 5, 185.00, 925.00, 6, '2025-11-15', 3),
-(35, 'Alaska Evaporated Milk 370ml', 12, 35.00, 420.00, 5, '2025-11-16', 2),
-(36, 'Del Monte Spaghetti Sauce 500g', 4, 75.00, 300.00, 5, '2025-11-16', 3),
-(2, 'iPhone 13 128GB', 1, 39990.00, 39990.00, 1, '2025-11-17', 2),
-(4, 'Sony WH-1000XM5 Headphones', 1, 19995.00, 19995.00, 1, '2025-11-17', 3),
-(11, 'Uniqlo AIRism Cotton T-Shirt', 6, 590.00, 3540.00, 2, '2025-12-01', 3),
-(15, 'Bench Plain Basic Tee', 10, 399.00, 3990.00, 2, '2025-12-01', 2),
-(33, 'Lucky Me! Pancit Canton 60g (Pack of 10)', 8, 125.00, 1000.00, 5, '2025-12-01', 3),
-(38, 'C2 Green Tea Apple 1L', 15, 42.00, 630.00, 5, '2025-12-02', 2),
-(46, 'Safeguard Bar Soap 135g (3s)', 6, 129.00, 774.00, 6, '2025-12-02', 3),
-(6, 'Samsung 55" 4K Smart TV', 1, 34990.00, 34990.00, 1, '2025-12-03', 2),
-(7, 'Apple AirPods Pro 2nd Gen', 2, 14995.00, 29990.00, 1, '2025-12-03', 3),
-(26, 'Adidas Tiro Training Pants', 3, 2495.00, 7485.00, 4, '2025-12-04', 2),
-(29, 'Decathlon Domyos Dumbbell 5kg', 4, 599.00, 2396.00, 4, '2025-12-04', 3),
-(50, 'Stabilo Boss Highlighter Set', 5, 295.00, 1475.00, 7, '2025-12-05', 2),
-(52, 'Campus Notebook 100 Leaves', 15, 49.00, 735.00, 7, '2025-12-05', 3),
-(58, 'Hot Wheels Basic Car (Random)', 12, 125.00, 1500.00, 8, '2025-12-06', 2),
-(63, 'UNO Card Game', 4, 349.00, 1396.00, 8, '2025-12-06', 3),
-(1, 'Samsung Galaxy A54 5G', 2, 22990.00, 45980.00, 1, '2025-12-07', 2),
-(5, 'Xiaomi Redmi Note 12 Pro', 3, 13999.00, 41997.00, 1, '2025-12-07', 3),
-(9, 'Levi\'s 501 Original Jeans', 2, 3995.00, 7990.00, 2, '2025-12-08', 2),
-(10, 'Nike Air Force 1 Sneakers', 1, 5495.00, 5495.00, 2, '2025-12-08', 3);
+(3, 'JBL Flip 6 Bluetooth Speaker', 2, 6495.00, 12990.00, 1, '2025-01-05', 3),
+(10, 'Nike Air Force 1 Sneakers', 2, 5495.00, 10990.00, 2, '2025-01-08', 3),
+(11, 'Uniqlo AIRism Cotton T-Shirt', 5, 590.00, 2950.00, 2, '2025-01-12', 2),
+(15, 'Bench Plain Basic Tee', 8, 399.00, 3192.00, 2, '2025-01-15', 3),
+(41, 'Cetaphil Gentle Skin Cleanser 500ml', 2, 895.00, 1790.00, 6, '2025-01-18', 2),
+(45, 'Belo Essentials Whitening Lotion 200ml', 3, 245.00, 735.00, 6, '2025-01-22', 3),
+(1, 'Samsung Galaxy A54 5G', 1, 22990.00, 22990.00, 1, '2025-01-25', 2),
+(5, 'Xiaomi Redmi Note 12 Pro', 2, 13999.00, 27998.00, 1, '2025-01-28', 3),
+(25, 'Nike Pro Dri-FIT Training Shirt', 4, 1895.00, 7580.00, 4, '2025-02-02', 3),
+(27, 'Yoga Mat 6mm Non-Slip', 3, 895.00, 2685.00, 4, '2025-02-05', 2),
+(37, 'Pringles Original 110g', 6, 89.00, 534.00, 5, '2025-02-08', 3),
+(38, 'C2 Green Tea Apple 1L', 10, 42.00, 420.00, 5, '2025-02-11', 3),
+(49, 'Mongol Pencil No. 2 (Box of 12)', 8, 89.00, 712.00, 7, '2025-02-14', 2),
+(51, 'Pilot G-Tec C4 Pen Black (12s)', 4, 399.00, 1596.00, 7, '2025-02-17', 3),
+(57, 'LEGO Classic Creative Box', 2, 2495.00, 4990.00, 8, '2025-02-20', 2),
+(60, 'Nerf Elite 2.0 Blaster', 1, 1895.00, 1895.00, 8, '2025-02-23', 3),
+(19, 'Philips Air Fryer XXL', 2, 7995.00, 15990.00, 3, '2025-02-26', 2),
+(20, 'Tefal Rice Cooker 1.8L', 3, 2495.00, 7485.00, 3, '2025-03-01', 3),
+(8, 'Logitech MX Master 3S Mouse', 2, 5495.00, 10990.00, 1, '2025-03-04', 2),
+(12, 'Adidas Originals Hoodie', 3, 3295.00, 9885.00, 2, '2025-03-07', 3),
+(28, 'Spalding NBA Basketball', 2, 1695.00, 3390.00, 4, '2025-03-10', 2),
+(44, 'Colgate Total Toothpaste 150g', 5, 185.00, 925.00, 6, '2025-03-13', 3),
+(35, 'Alaska Evaporated Milk 370ml', 12, 35.00, 420.00, 5, '2025-03-16', 2),
+(36, 'Del Monte Spaghetti Sauce 500g', 4, 75.00, 300.00, 5, '2025-03-19', 3),
+(2, 'iPhone 13 128GB', 1, 39990.00, 39990.00, 1, '2025-03-22', 2),
+(4, 'Sony WH-1000XM5 Headphones', 1, 19995.00, 19995.00, 1, '2025-03-25', 3),
+(65, 'Samsung Galaxy Buds2 Pro', 2, 9995.00, 19990.00, 1, '2025-03-28', 2),
+(66, 'Dell P2422H 24" Monitor', 1, 12995.00, 12995.00, 1, '2025-04-01', 3),
+(67, 'Razer DeathAdder V3 Gaming Mouse', 3, 3995.00, 11985.00, 1, '2025-04-04', 2),
+(68, 'Anker PowerCore 20000mAh', 5, 1895.00, 9475.00, 1, '2025-04-07', 3),
+(73, 'Zara Slim Fit Chinos', 2, 2495.00, 4990.00, 2, '2025-04-10', 2),
+(74, 'Champion Classic Sweatshirt', 3, 2295.00, 6885.00, 2, '2025-04-13', 3),
+(75, 'Converse Chuck Taylor All Star', 2, 3295.00, 6590.00, 2, '2025-04-16', 2),
+(76, 'Gap Basic Crew Neck Sweater', 4, 1895.00, 7580.00, 2, '2025-04-19', 3),
+(81, 'Instant Pot Duo 7-in-1', 1, 6495.00, 6495.00, 3, '2025-04-22', 2),
+(82, 'Panasonic Microwave 25L', 2, 4995.00, 9990.00, 3, '2025-04-25', 3),
+(84, 'Black+Decker Toaster Oven', 3, 3295.00, 9885.00, 3, '2025-04-28', 2),
+(85, 'Rubbermaid Storage Bins Set', 4, 1295.00, 5180.00, 3, '2025-05-01', 3),
+(87, 'Under Armour Compression Shirt', 3, 2195.00, 6585.00, 4, '2025-05-04', 2),
+(88, 'Puma Running Shorts', 5, 1595.00, 7975.00, 4, '2025-05-07', 3),
+(89, 'Garmin Forerunner 55', 1, 10995.00, 10995.00, 4, '2025-05-10', 2),
+(92, 'Yonex Badminton Racket', 2, 2895.00, 5790.00, 4, '2025-05-13', 3),
+(93, 'Milo Activ-Go 1kg', 6, 295.00, 1770.00, 5, '2025-05-16', 2),
+(95, 'Spam Classic 340g', 4, 185.00, 740.00, 5, '2025-05-19', 3),
+(96, 'Nutella Hazelnut Spread 350g', 5, 215.00, 1075.00, 5, '2025-05-22', 2),
+(97, 'Kellogg\'s Corn Flakes 500g', 3, 245.00, 735.00, 5, '2025-05-25', 3),
+(98, 'Maggi Magic Sarap 50g', 10, 32.00, 320.00, 5, '2025-05-28', 2),
+(99, 'Tropicana Orange Juice 1L', 6, 125.00, 750.00, 5, '2025-05-31', 3),
+(100, 'Oreo Cookies Original 133g', 8, 65.00, 520.00, 5, '2025-06-03', 2),
+(101, 'Ponds White Beauty Cream 50g', 4, 189.00, 756.00, 6, '2025-06-06', 3),
+(102, 'Head & Shoulders Shampoo 340ml', 3, 245.00, 735.00, 6, '2025-06-09', 2),
+(103, 'Oral-B Pro-Health Toothbrush', 6, 95.00, 570.00, 6, '2025-06-12', 3),
+(105, 'Garnier Micellar Water 400ml', 2, 395.00, 790.00, 6, '2025-06-15', 2),
+(106, 'Vaseline Petroleum Jelly 100ml', 5, 125.00, 625.00, 6, '2025-06-18', 3),
+(107, 'Casio Scientific Calculator FX-991ES', 2, 895.00, 1790.00, 7, '2025-06-21', 2),
+(109, 'Staedtler Eraser Mars Plastic', 10, 35.00, 350.00, 7, '2025-06-24', 3),
+(110, 'Scotch Magic Tape', 8, 125.00, 1000.00, 7, '2025-06-27', 2),
+(111, 'Moleskine Classic Notebook', 3, 795.00, 2385.00, 7, '2025-06-30', 3),
+(113, 'Monopoly Classic Board Game', 2, 1895.00, 3790.00, 8, '2025-07-03', 2),
+(114, 'Jenga Classic Game', 4, 895.00, 3580.00, 8, '2025-07-06', 3),
+(115, 'Fisher-Price Baby Walker', 1, 2495.00, 2495.00, 8, '2025-07-09', 2),
+(116, 'Crayola Crayon Box 64-count', 5, 595.00, 2975.00, 8, '2025-07-12', 3),
+(117, 'Transformers Optimus Prime', 2, 1695.00, 3390.00, 8, '2025-07-15', 2),
+(118, 'Funko Pop! Marvel Spider-Man', 6, 795.00, 4770.00, 8, '2025-07-18', 3),
+(119, 'Castrol GTX 10W-40 Engine Oil 1L', 4, 495.00, 1980.00, 9, '2025-07-21', 2),
+(120, 'Bosch Wiper Blades 22"', 2, 895.00, 1790.00, 9, '2025-07-24', 3),
+(121, 'Turtle Wax Car Shampoo 1L', 5, 345.00, 1725.00, 9, '2025-07-27', 2),
+(123, 'Armor All Dashboard Cleaner', 6, 295.00, 1770.00, 9, '2025-07-30', 3),
+(125, 'Pedigree Adult Dog Food 1.5kg', 3, 385.00, 1155.00, 10, '2025-08-02', 2),
+(126, 'Whiskas Cat Food Pouch 85g (12-pack)', 4, 295.00, 1180.00, 10, '2025-08-05', 3),
+(127, 'Flexi Retractable Dog Leash', 2, 1295.00, 2590.00, 10, '2025-08-08', 2),
+(129, 'Cat Litter Breeder\'s Choice 15L', 3, 695.00, 2085.00, 10, '2025-08-11', 3),
+(130, 'Kong Classic Dog Toy', 5, 495.00, 2475.00, 10, '2025-08-14', 2),
+(131, 'Black & Decker Cordless Drill', 1, 3495.00, 3495.00, 11, '2025-08-17', 3),
+(132, 'Stanley Toolbox 19"', 2, 1295.00, 2590.00, 11, '2025-08-20', 2),
+(133, 'Gardena Garden Hose 20m', 1, 1895.00, 1895.00, 11, '2025-08-23', 3),
+(134, 'Fiskars Pruning Shears', 3, 795.00, 2385.00, 11, '2025-08-26', 2),
+(135, 'Miracle-Gro Plant Food', 4, 395.00, 1580.00, 11, '2025-08-29', 3),
+(137, 'Yamaha C40 Classical Guitar', 1, 8995.00, 8995.00, 12, '2025-09-01', 2),
+(139, 'Shure SM58 Microphone', 2, 5495.00, 10990.00, 12, '2025-09-04', 3),
+(140, 'Audio-Technica ATH-M50x Headphones', 1, 8995.00, 8995.00, 12, '2025-09-07', 2),
+(141, 'Korg Tuner CA-50', 4, 795.00, 3180.00, 12, '2025-09-10', 3),
+(142, 'D\'Addario Guitar Strings EXL110', 6, 495.00, 2970.00, 12, '2025-09-13', 2),
+(69, 'Lenovo IdeaPad Slim 3', 1, 29995.00, 29995.00, 1, '2025-09-16', 3),
+(70, 'Canon EOS M50 Mark II', 1, 45995.00, 45995.00, 1, '2025-09-19', 2),
+(71, 'TP-Link WiFi 6 Router', 2, 3495.00, 6990.00, 1, '2025-09-22', 3),
+(77, 'Lacoste Classic Polo Shirt', 2, 4995.00, 9990.00, 2, '2025-09-25', 2),
+(78, 'Vans Old Skool Black/White', 3, 3795.00, 11385.00, 2, '2025-09-28', 3),
+(11, 'Uniqlo AIRism Cotton T-Shirt', 6, 590.00, 3540.00, 2, '2025-10-01', 3),
+(15, 'Bench Plain Basic Tee', 10, 399.00, 3990.00, 2, '2025-10-04', 2),
+(33, 'Lucky Me! Pancit Canton 60g (Pack of 10)', 8, 125.00, 1000.00, 5, '2025-10-07', 3),
+(38, 'C2 Green Tea Apple 1L', 15, 42.00, 630.00, 5, '2025-10-10', 2),
+(46, 'Safeguard Bar Soap 135g (3s)', 6, 129.00, 774.00, 6, '2025-10-13', 3),
+(6, 'Samsung 55" 4K Smart TV', 1, 34990.00, 34990.00, 1, '2025-10-16', 2),
+(7, 'Apple AirPods Pro 2nd Gen', 2, 14995.00, 29990.00, 1, '2025-10-19', 3),
+(26, 'Adidas Tiro Training Pants', 3, 2495.00, 7485.00, 4, '2025-10-22', 2),
+(29, 'Decathlon Domyos Dumbbell 5kg', 4, 599.00, 2396.00, 4, '2025-10-25', 3),
+(50, 'Stabilo Boss Highlighter Set', 5, 295.00, 1475.00, 7, '2025-10-28', 2),
+(52, 'Campus Notebook 100 Leaves', 15, 49.00, 735.00, 7, '2025-10-31', 3),
+(58, 'Hot Wheels Basic Car (Random)', 12, 125.00, 1500.00, 8, '2025-11-03', 2),
+(63, 'UNO Card Game', 4, 349.00, 1396.00, 8, '2025-11-06', 3),
+(1, 'Samsung Galaxy A54 5G', 2, 22990.00, 45980.00, 1, '2025-11-09', 2),
+(5, 'Xiaomi Redmi Note 12 Pro', 3, 13999.00, 41997.00, 1, '2025-11-12', 3),
+(9, 'Levi\'s 501 Original Jeans', 2, 3995.00, 7990.00, 2, '2025-11-15', 2),
+(10, 'Nike Air Force 1 Sneakers', 1, 5495.00, 5495.00, 2, '2025-11-18', 3),
+(3, 'JBL Flip 6 Bluetooth Speaker', 3, 6495.00, 19485.00, 1, '2025-11-21', 2),
+(12, 'Adidas Originals Hoodie', 2, 3295.00, 6590.00, 2, '2025-11-24', 3),
+(25, 'Nike Pro Dri-FIT Training Shirt', 5, 1895.00, 9475.00, 4, '2025-11-27', 2),
+(27, 'Yoga Mat 6mm Non-Slip', 4, 895.00, 3580.00, 4, '2025-11-30', 3),
+(37, 'Pringles Original 110g', 8, 89.00, 712.00, 5, '2025-12-03', 2),
+(41, 'Cetaphil Gentle Skin Cleanser 500ml', 3, 895.00, 2685.00, 6, '2025-12-06', 3),
+(49, 'Mongol Pencil No. 2 (Box of 12)', 10, 89.00, 890.00, 7, '2025-12-08', 2);

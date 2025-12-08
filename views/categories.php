@@ -28,23 +28,25 @@
 </div>
 
 <div id="categoryModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">
             <h2 class="modal-title" id="categoryModalTitle">Add New Category</h2>
             <button class="modal-close" onclick="closeCategoryModal()">&times;</button>
         </div>
         <form id="categoryForm" onsubmit="saveCategory(event)">
-            <input type="hidden" id="categoryId">
-            <div class="form-group">
-                <label for="categoryName">Category Name</label>
-                <input type="text" id="categoryName" placeholder="e.g., Electronics" required>
+            <div style="padding: 20px;">
+                <input type="hidden" id="categoryId">
+                <div class="form-group">
+                    <label for="categoryName">Category Name</label>
+                    <input type="text" id="categoryName" placeholder="e.g., Electronics" required>
+                </div>
+                <div class="form-group">
+                    <label for="categoryDescription">Description (Optional)</label>
+                    <textarea id="categoryDescription" rows="2" placeholder="Brief description of the category"></textarea>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="categoryDescription">Description (Optional)</label>
-                <textarea id="categoryDescription" rows="3" placeholder="Brief description of the category"></textarea>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-cancel" onclick="closeCategoryModal()">Cancel</button>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCategoryModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Category</button>
             </div>
         </form>
@@ -67,7 +69,6 @@ function loadCategories() {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8;">No categories found. <a href="#" onclick="openCategoryModal(); return false;" style="color: var(--primary);">Add one now</a></td></tr>';
                 return;
             }
-            
             tbody.innerHTML = data.map(cat => `
                 <tr>
                     <td><strong>${cat.id}</strong></td>
@@ -101,7 +102,7 @@ function openCategoryModal() {
     document.getElementById('categoryId').value = '';
     document.getElementById('categoryName').value = '';
     document.getElementById('categoryDescription').value = '';
-    document.getElementById('categoryModal').classList.add('active');
+    document.getElementById('categoryModal').style.display = 'flex';
 }
 
 function editCategory(category) {
@@ -109,11 +110,11 @@ function editCategory(category) {
     document.getElementById('categoryId').value = category.id;
     document.getElementById('categoryName').value = category.name;
     document.getElementById('categoryDescription').value = category.description || '';
-    document.getElementById('categoryModal').classList.add('active');
+    document.getElementById('categoryModal').style.display = 'flex';
 }
 
 function closeCategoryModal() {
-    document.getElementById('categoryModal').classList.remove('active');
+    document.getElementById('categoryModal').style.display = 'none';
     document.getElementById('categoryForm').reset();
 }
 
@@ -175,5 +176,11 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
 }
 </script>
