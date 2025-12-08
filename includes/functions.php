@@ -244,7 +244,7 @@ function getSales()
               FROM sales s 
               LEFT JOIN categories c ON s.category_id = c.id 
               LEFT JOIN users u ON s.sold_by = u.id 
-              ORDER BY s.sale_date DESC, s.id DESC";
+              ORDER BY s.created_at DESC, s.id DESC";
     $query_run = mysqli_query($conn, $query);
     
     if ($query_run) {

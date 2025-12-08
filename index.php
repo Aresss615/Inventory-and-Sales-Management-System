@@ -68,7 +68,7 @@ usort($topProducts, function($a, $b) {
 $topProducts = array_slice($topProducts, 0, 4);
 
 $salesData = [];
-$sales_result = mysqli_query($conn, "SELECT s.*, s.qty as quantity, p.name as product_name FROM sales s LEFT JOIN products p ON s.product_id = p.id ORDER BY s.sale_date DESC LIMIT 100");
+$sales_result = mysqli_query($conn, "SELECT s.*, s.qty as quantity, p.name as product_name, u.username as sold_by_username FROM sales s LEFT JOIN products p ON s.product_id = p.id LEFT JOIN users u ON s.sold_by = u.id ORDER BY s.created_at DESC LIMIT 100");
 if ($sales_result) {
     $salesData = mysqli_fetch_all($sales_result, MYSQLI_ASSOC);
 }
