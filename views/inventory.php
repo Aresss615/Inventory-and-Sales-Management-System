@@ -1,27 +1,23 @@
-<form method="get" class="controls">
-    <input type="hidden" name="page" value="inventory">
+<div class="controls">
     <button type="button" class="btn btn-primary" onclick="openAddModal()">
         <i class="fas fa-plus"></i> Add New Item
     </button>
-    <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" class="input-field" placeholder="Search by name or SKU...">
-    <select name="category" class="select">
+    <input type="text" id="searchFilter" class="input-field" placeholder="Search by name or SKU..." oninput="applyFilters()">
+    <select id="categoryFilter" class="select" onchange="applyFilters()">
         <option value="">All Categories</option>
         <?php foreach ($categories as $cat): ?>
-            <option value="<?php echo $cat['id']; ?>" <?php echo $category == $cat['id'] ? 'selected' : ''; ?>>
+            <option value="<?php echo $cat['id']; ?>">
                 <?php echo htmlspecialchars($cat['name']); ?>
             </option>
         <?php endforeach; ?>
     </select>
-    <select name="stock" class="select">
+    <select id="stockFilter" class="select" onchange="applyFilters()">
         <option value="">All Items</option>
-        <option value="in-stock" <?php echo $stock === 'in-stock' ? 'selected' : ''; ?>>In Stock</option>
-        <option value="low-stock" <?php echo $stock === 'low-stock' ? 'selected' : ''; ?>>Low Stock</option>
-        <option value="out-stock" <?php echo $stock === 'out-stock' ? 'selected' : ''; ?>>Out of Stock</option>
+        <option value="in-stock">In Stock</option>
+        <option value="low-stock">Low Stock</option>
+        <option value="out-stock">Out of Stock</option>
     </select>
-    <button type="submit" class="btn btn-secondary">
-        <i class="fas fa-filter"></i> Filter
-    </button>
-</form>
+</div>
 
 <div class="table-container">
     <table>
@@ -84,3 +80,91 @@
         </tbody>
     </table>
 </div>
+
+<script>
+const allProducts = <?php echo json_encode($products); ?>;
+
+function applyFilters() {
+    const searchValue = document.getElementById('searchFilter').value.toLowerCase();
+    const categoryValue = document.getElementById('categoryFilter').value;
+    const stockValue = document.getElementById('stockFilter').value;
+
+    const filtered = allProducts.filter(item => {
+        const matchSearch = searchValue === '' || 
+                          item.name.toLowerCase().includes(searchValue) || 
+                          item.sku.toLowerCase().includes(searchValue) || 
+                          item.barcode.toLowerCase().includes(searchValue);
+        
+        const matchCategory = categoryValue === '' || item.category_id == categoryValue;
+        
+        let matchStock = true;
+        if (stockValue === 'in-stock') {
+            matchStock = item.stock > item.minStock;
+        } else if (stockValue === 'low-stock') {
+            matchStock = item.stock > 0 && item.stock <= item.minStock;
+        } else if (stockValue === 'out-stock') {
+            matchStock = item.stock == 0;
+        }
+        
+        return matchSearch && matchCategory && matchStock;
+    });
+
+    renderTable(filtered);
+}
+
+function renderTable(products) {
+    const tbody = document.querySelector('.table-container tbody');
+    
+    if (products.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">No items in inventory. <a href="#" onclick="openAddModal(); return false;" style="color: var(--primary);">Add one now</a></td></tr>';
+        return;
+    }
+
+    let html = '';
+    products.forEach(item => {
+        let status, badge;
+        if (item.stock == 0) {
+            status = 'Out of Stock';
+            badge = 'badge-danger';
+        } else if (item.stock <= item.minStock) {
+            status = 'Low Stock';
+            badge = 'badge-warning';
+        } else {
+            status = 'In Stock';
+            badge = 'badge-success';
+        }
+
+        html += `
+            <tr>
+                <td><strong>${escapeHtml(item.sku)}</strong></td>
+                <td>${escapeHtml(item.name)}</td>
+                <td><code style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${escapeHtml(item.barcode)}</code></td>
+                <td>${escapeHtml(item.category_name || 'N/A')}</td>
+                <td><strong>${item.stock}</strong></td>
+                <td>₱${parseFloat(item.price).toFixed(2)}</td>
+                <td><span class="badge ${badge}">${status}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-edit" onclick="openEditModal(${item.id}, '${escapeHtml(item.sku)}', '${escapeHtml(item.name)}', '${escapeHtml(item.barcode)}', ${item.category_id}, ${item.stock}, ${item.price}, ${item.minStock})">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <?php if ($current_user['role'] === 'admin' || $current_user['role'] === 'manager'): ?>
+                        <button class="btn btn-sm btn-delete" onclick="openDeleteModal(${item.id})">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
