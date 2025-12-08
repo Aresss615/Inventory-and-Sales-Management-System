@@ -3,12 +3,11 @@ session_start();
 require __DIR__ . "/../config/database.php";
 require __DIR__ . "/../config/auth.php";
 
-checkRole(['admin']);
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : 'save';
     
     if ($action === 'delete') {
+        checkPermission('users_delete');
         $id = mysqli_real_escape_string($conn, $_POST['id']);
         
         if ($id == $_SESSION['user_id']) {
@@ -25,16 +24,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     } else {
         $id = isset($_POST['id']) && !empty($_POST['id']) ? mysqli_real_escape_string($conn, $_POST['id']) : null;
+        
+        if ($id) {
+            checkPermission('users_edit');
+        } else {
+            checkPermission('users_create');
+        }
+        
         $username = mysqli_real_escape_string($conn, $_POST['username']);
         $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
         $email = mysqli_real_escape_string($conn, $_POST['email']);
-        $role = mysqli_real_escape_string($conn, $_POST['role']);
+        $role_id = mysqli_real_escape_string($conn, $_POST['role_id']);
         $is_active = isset($_POST['is_active']) ? 1 : 0;
         $password = isset($_POST['password']) && !empty($_POST['password']) ? $_POST['password'] : null;
         
         if ($id) {
             $query = "UPDATE users SET username='$username', full_name='$full_name', 
-                      email='$email', role='$role', is_active='$is_active'";
+                      email='$email', role_id='$role_id', is_active='$is_active'";
             
             if ($password) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -62,8 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $query = "INSERT INTO users (username, password, email, full_name, role, is_active) 
-                      VALUES ('$username', '$hashed_password', '$email', '$full_name', '$role', '$is_active')";
+            $created_by = $_SESSION['user_id'];
+            $query = "INSERT INTO users (username, password, email, full_name, role_id, is_active, created_by) 
+                      VALUES ('$username', '$hashed_password', '$email', '$full_name', '$role_id', '$is_active', '$created_by')";
             
             if (mysqli_query($conn, $query)) {
                 header('Location: index.php?page=users&success=created');

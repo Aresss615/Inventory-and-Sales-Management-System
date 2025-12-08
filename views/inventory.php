@@ -119,7 +119,7 @@ function renderTable(products) {
         tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">No items in inventory. <a href="#" onclick="openAddModal(); return false;" style="color: var(--primary);">Add one now</a></td></tr>';
         return;
     }
-
+    
     let html = '';
     products.forEach(item => {
         let status, badge;

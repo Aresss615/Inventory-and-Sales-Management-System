@@ -1,8 +1,8 @@
 <div class="controls">
-    <select class="select">
-        <option value="daily">Daily Report</option>
-        <option value="weekly">Weekly Report</option>
-        <option value="monthly">Monthly Report</option>
+    <select class="select" id="reportPeriodFilter" onchange="window.location.href='?page=reports&period=' + this.value">
+        <option value="daily" <?php echo $reportPeriod === 'daily' ? 'selected' : ''; ?>>Daily Report</option>
+        <option value="weekly" <?php echo $reportPeriod === 'weekly' ? 'selected' : ''; ?>>Weekly Report</option>
+        <option value="monthly" <?php echo $reportPeriod === 'monthly' ? 'selected' : ''; ?>>Monthly Report</option>
     </select>
 </div>
 

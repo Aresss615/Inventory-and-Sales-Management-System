@@ -1,8 +1,17 @@
 <?php require_once __DIR__ . '/../config/config.php'; ?>
+<?php
+checkPermission('users_view');
+$can_create = hasPermission('users_create');
+$can_edit = hasPermission('users_edit');
+$can_delete = hasPermission('users_delete');
+?>
+
 <div class="controls" style="margin-bottom: 24px;">
+    <?php if ($can_create): ?>
     <button type="button" class="btn btn-primary" onclick="openUserModal()">
-        <i class="fas fa-plus"></i> Add New User
+        <i class="fas fa-plus"></i> Add New Staff/User
     </button>
+    <?php endif; ?>
 </div>
 
 <div class="table-container">
@@ -15,28 +24,36 @@
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th>Created By</th>
                 <th>Created</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             <?php
-            $users_result = mysqli_query($conn, "SELECT * FROM users ORDER BY id ASC");
+            $users_query = "SELECT u.*, r.display_name as role_display, r.name as role_name, 
+                           creator.username as creator_name
+                           FROM users u
+                           JOIN roles r ON u.role_id = r.id
+                           LEFT JOIN users creator ON u.created_by = creator.id
+                           ORDER BY u.id ASC";
+            $users_result = mysqli_query($conn, $users_query);
             if ($users_result && mysqli_num_rows($users_result) > 0):
                 while ($user = mysqli_fetch_assoc($users_result)):
                     $role_badges = [
                         'admin' => 'badge-danger',
                         'manager' => 'badge-warning',
-                        'staff' => 'badge-info'
+                        'cashier' => 'badge-info',
+                        'stock_manager' => 'badge-primary'
                     ];
-                    $badge = $role_badges[$user['role']] ?? 'badge-info';
+                    $badge = $role_badges[$user['role_name']] ?? 'badge-secondary';
             ?>
                 <tr>
                     <td><strong><?php echo $user['id']; ?></strong></td>
                     <td><?php echo htmlspecialchars($user['username']); ?></td>
                     <td><?php echo htmlspecialchars($user['full_name']); ?></td>
                     <td><?php echo htmlspecialchars($user['email']); ?></td>
-                    <td><span class="badge <?php echo $badge; ?>"><?php echo ucfirst($user['role']); ?></span></td>
+                    <td><span class="badge <?php echo $badge; ?>"><?php echo htmlspecialchars($user['role_display']); ?></span></td>
                     <td>
                         <?php if ($user['is_active']): ?>
                             <span class="badge badge-success">Active</span>
@@ -44,13 +61,16 @@
                             <span class="badge badge-danger">Inactive</span>
                         <?php endif; ?>
                     </td>
+                    <td><?php echo $user['creator_name'] ? htmlspecialchars($user['creator_name']) : 'System'; ?></td>
                     <td><?php echo date('M d, Y', strtotime($user['created_at'])); ?></td>
                     <td>
                         <div class="action-buttons">
+                            <?php if ($can_edit): ?>
                             <button class="btn btn-sm btn-edit" onclick='editUser(<?php echo json_encode($user); ?>)'>
                                 <i class="fas fa-edit"></i> Edit
                             </button>
-                            <?php if ($user['id'] != $current_user['id']): ?>
+                            <?php endif; ?>
+                            <?php if ($can_delete && $user['id'] != $current_user['id']): ?>
                             <button class="btn btn-sm btn-delete" onclick="deleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['username']); ?>')">
                                 <i class="fas fa-trash"></i> Delete
                             </button>
@@ -63,7 +83,7 @@
             else:
             ?>
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">
+                    <td colspan="9" style="text-align: center; padding: 40px; color: #94a3b8;">
                         No users found.
                     </td>
                 </tr>
@@ -73,46 +93,55 @@
 </div>
 
 <div id="userModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">
             <h2 class="modal-title" id="userModalTitle">Add New User</h2>
             <button class="modal-close" onclick="closeUserModal()">&times;</button>
         </div>
         <form id="userForm" method="POST" action="<?php echo API_URL; ?>/users.php">
-            <input type="hidden" name="id" id="userId">
-            <div class="form-group">
-                <label for="userUsername">Username</label>
-                <input type="text" name="username" id="userUsername" required>
+            <div style="padding: 20px;">
+                <input type="hidden" name="id" id="userId">
+                <div class="form-group">
+                    <label for="userUsername">Username</label>
+                    <input type="text" name="username" id="userUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="userFullName">Full Name</label>
+                    <input type="text" name="full_name" id="userFullName" required>
+                </div>
+                <div class="form-group">
+                    <label for="userEmail">Email</label>
+                    <input type="email" name="email" id="userEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="userRole">Role</label>
+                    <select name="role_id" id="userRole" required>
+                        <?php
+                        $roles_query = "SELECT * FROM roles ORDER BY is_system DESC, display_name ASC";
+                        $roles_result = mysqli_query($conn, $roles_query);
+                        while ($role = mysqli_fetch_assoc($roles_result)):
+                        ?>
+                            <option value="<?php echo $role['id']; ?>">
+                                <?php echo htmlspecialchars($role['display_name']); ?>
+                                <?php if ($role['is_system']): ?>(System)<?php endif; ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="form-group" id="passwordGroup">
+                    <label for="userPassword">Password</label>
+                    <input type="password" name="password" id="userPassword" minlength="6">
+                    <small style="color: #64748b;">Leave blank to keep current password (when editing)</small>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="is_active" id="userActive" value="1" checked>
+                        Active
+                    </label>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="userFullName">Full Name</label>
-                <input type="text" name="full_name" id="userFullName" required>
-            </div>
-            <div class="form-group">
-                <label for="userEmail">Email</label>
-                <input type="email" name="email" id="userEmail" required>
-            </div>
-            <div class="form-group">
-                <label for="userRole">Role</label>
-                <select name="role" id="userRole" required>
-                    <option value="staff">Staff</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
-                </select>
-            </div>
-            <div class="form-group" id="passwordGroup">
-                <label for="userPassword">Password</label>
-                <input type="password" name="password" id="userPassword" minlength="6">
-                <small style="color: #64748b;">Leave blank to keep current password (when editing)</small>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="is_active" id="userActive" value="1" checked>
-                    Active
-                </label>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-cancel" onclick="closeUserModal()">Cancel</button>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save User</button>
             </div>
         </form>
@@ -121,11 +150,11 @@
 
 <script>
 function openUserModal() {
-    document.getElementById('userModalTitle').textContent = 'Add New User';
+    document.getElementById('userModalTitle').textContent = 'Add New Staff/User';
     document.getElementById('userForm').reset();
     document.getElementById('userId').value = '';
     document.getElementById('userPassword').required = true;
-    document.getElementById('userModal').classList.add('active');
+    document.getElementById('userModal').style.display = 'flex';
 }
 
 function editUser(user) {
@@ -134,15 +163,15 @@ function editUser(user) {
     document.getElementById('userUsername').value = user.username;
     document.getElementById('userFullName').value = user.full_name;
     document.getElementById('userEmail').value = user.email;
-    document.getElementById('userRole').value = user.role;
+    document.getElementById('userRole').value = user.role_id;
     document.getElementById('userActive').checked = user.is_active == 1;
     document.getElementById('userPassword').required = false;
     document.getElementById('userPassword').value = '';
-    document.getElementById('userModal').classList.add('active');
+    document.getElementById('userModal').style.display = 'flex';
 }
 
 function closeUserModal() {
-    document.getElementById('userModal').classList.remove('active');
+    document.getElementById('userModal').style.display = 'none';
 }
 
 function deleteUser(id, username) {
@@ -168,5 +197,11 @@ function deleteUser(id, username) {
     form.appendChild(actionInput);
     document.body.appendChild(form);
     form.submit();
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
 }
 </script>

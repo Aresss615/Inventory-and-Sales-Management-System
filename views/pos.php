@@ -1,3 +1,4 @@
+<?php displayNotification(); ?>
 <div class="pos-container">
     <div class="pos-products">
         <div class="pos-search">
@@ -6,7 +7,9 @@
         <div class="pos-grid" id="posGrid">
             <?php foreach ($products as $product): ?>
                 <?php if ($product['stock'] > 0): ?>
-                    <div class="pos-card" onclick="addToCart(<?php echo $product['id']; ?>, <?php echo htmlspecialchars(json_encode($product['name'])); ?>, <?php echo $product['price']; ?>, <?php echo $product['stock']; ?>)">
+                    <div class="pos-card" 
+                         data-barcode="<?php echo htmlspecialchars($product['barcode']); ?>"
+                         onclick="addToCart(<?php echo $product['id']; ?>, <?php echo htmlspecialchars(json_encode($product['name'])); ?>, <?php echo $product['price']; ?>, <?php echo $product['stock']; ?>)">
                         <div class="pos-card-name"><?php echo htmlspecialchars($product['name']); ?></div>
                         <div class="pos-card-sku"><?php echo htmlspecialchars($product['sku']); ?></div>
                         <div class="pos-card-stock">Stock: <?php echo $product['stock']; ?></div>
@@ -30,6 +33,48 @@
                 <span id="cartTotal">₱0.00</span>
             </div>
             <button class="btn btn-primary btn-block" onclick="checkout()" id="checkoutBtn" disabled>Checkout</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="clearCartModal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3 class="modal-title">Clear Cart</h3>
+            <button class="modal-close" onclick="closeClearCartModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to clear all items from the cart?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeClearCartModal()">Cancel</button>
+            <button class="btn btn-danger" onclick="confirmClearCart()">Clear Cart</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="checkoutModal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3 class="modal-title">Checkout</h3>
+            <button class="modal-close" onclick="closeCheckoutModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Total Amount</label>
+                <div style="font-size: 24px; font-weight: 700; color: var(--primary); margin: 10px 0;">
+                    <span id="checkoutTotal">₱0.00</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Payment Amount</label>
+                <input type="number" id="paymentAmount" class="input-field" placeholder="Enter payment amount" step="0.01" min="0">
+                <small id="changeAmount" style="margin-top: 5px; color: var(--success); font-weight: 600;"></small>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeCheckoutModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmCheckout()" id="confirmCheckoutBtn">Confirm Checkout</button>
         </div>
     </div>
 </div>
@@ -73,10 +118,19 @@ function updateQty(id, qty) {
 }
 
 function clearCart() {
-    if (cart.length > 0 && confirm('Clear all items from cart?')) {
-        cart = [];
-        renderCart();
+    if (cart.length > 0) {
+        document.getElementById('clearCartModal').classList.add('active');
     }
+}
+
+function closeClearCartModal() {
+    document.getElementById('clearCartModal').classList.remove('active');
+}
+
+function confirmClearCart() {
+    cart = [];
+    renderCart();
+    closeClearCartModal();
 }
 
 function renderCart() {
@@ -122,18 +176,60 @@ function renderCart() {
 
 function checkout() {
     if (cart.length === 0) {
-        alert('Cart is empty');
         return;
     }
     
     const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const confirmation = prompt(`Total: ₱${total.toFixed(2)}\n\nType "YES" to confirm checkout:`);
+    document.getElementById('checkoutTotal').textContent = '₱' + total.toFixed(2);
+    document.getElementById('paymentAmount').value = '';
+    document.getElementById('changeAmount').textContent = '';
+    document.getElementById('checkoutModal').classList.add('active');
+    document.getElementById('paymentAmount').focus();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentInput = document.getElementById('paymentAmount');
+    if (paymentInput) {
+        paymentInput.addEventListener('input', function() {
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const payment = parseFloat(this.value);
+            const changeDisplay = document.getElementById('changeAmount');
+            
+            if (payment && payment > 0) {
+                const change = payment - total;
+                if (change >= 0) {
+                    changeDisplay.textContent = `Change: ₱${change.toFixed(2)}`;
+                    changeDisplay.style.color = 'var(--success)';
+                } else {
+                    changeDisplay.textContent = `Insufficient: ₱${Math.abs(change).toFixed(2)} short`;
+                    changeDisplay.style.color = 'var(--danger)';
+                }
+            } else {
+                changeDisplay.textContent = '';
+            }
+        });
+    }
+});
+
+function closeCheckoutModal() {
+    document.getElementById('checkoutModal').classList.remove('active');
+}
+
+function confirmCheckout() {
+    const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
     
-    if (confirmation === null || confirmation.toUpperCase() !== 'YES') {
+    if (!paymentAmount || paymentAmount <= 0) {
+        alert('Please enter a valid payment amount');
         return;
     }
     
-    const checkoutBtn = document.getElementById('checkoutBtn');
+    if (paymentAmount < total) {
+        alert('Payment amount is less than total');
+        return;
+    }
+    
+    const checkoutBtn = document.getElementById('confirmCheckoutBtn');
     checkoutBtn.disabled = true;
     checkoutBtn.textContent = 'Processing...';
     
@@ -151,21 +247,21 @@ function checkout() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 200) {
-            alert(data.message);
             cart = [];
             renderCart();
-            window.location.href = '?page=pos';
+            closeCheckoutModal();
+            window.location.href = '?page=pos&checkout_success=1&change=' + (paymentAmount - total).toFixed(2);
         } else {
             alert(data.message || 'Checkout failed');
             checkoutBtn.disabled = false;
-            checkoutBtn.textContent = 'Checkout';
+            checkoutBtn.textContent = 'Confirm Checkout';
         }
     })
     .catch(error => {
         console.error('Error:', error);
         alert('Error processing checkout');
         checkoutBtn.disabled = false;
-        checkoutBtn.textContent = 'Checkout';
+        checkoutBtn.textContent = 'Confirm Checkout';
     });
 }
 
@@ -179,12 +275,24 @@ document.getElementById('posSearch').addEventListener('input', function(e) {
     const search = e.target.value.toLowerCase();
     const cards = document.querySelectorAll('.pos-card');
     
+    let foundByBarcode = false;
+    
     cards.forEach(card => {
         const name = card.querySelector('.pos-card-name').textContent.toLowerCase();
         const sku = card.querySelector('.pos-card-sku').textContent.toLowerCase();
+        const barcode = card.dataset.barcode.toLowerCase();
         
-        if (name.includes(search) || sku.includes(search)) {
+        if (name.includes(search) || sku.includes(search) || barcode.includes(search)) {
             card.style.display = 'block';
+            
+            if (barcode === search && search.length > 5) {
+                foundByBarcode = true;
+                setTimeout(() => {
+                    card.click();
+                    document.getElementById('posSearch').value = '';
+                    document.querySelectorAll('.pos-card').forEach(c => c.style.display = 'block');
+                }, 100);
+            }
         } else {
             card.style.display = 'none';
         }

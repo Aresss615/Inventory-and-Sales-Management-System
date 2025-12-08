@@ -1,7 +1,30 @@
 <?php
 
-require __DIR__ . "/../config/database.php";
-require __DIR__ . "/../config/auth.php";
+function setNotification($message, $type = 'success') {
+    $_SESSION['notification'] = [
+        'message' => $message,
+        'type' => $type
+    ];
+}
+
+function getNotification() {
+    if (isset($_SESSION['notification'])) {
+        $notification = $_SESSION['notification'];
+        unset($_SESSION['notification']);
+        return $notification;
+    }
+    return null;
+}
+
+function displayNotification() {
+    $notification = getNotification();
+    if ($notification) {
+        echo '<div class="alert alert-' . htmlspecialchars($notification['type']) . ' active" id="notification">';
+        echo htmlspecialchars($notification['message']);
+        echo '</div>';
+        echo '<script>setTimeout(() => { const n = document.getElementById("notification"); if(n) n.classList.remove("active"); }, 5000);</script>';
+    }
+}
 
 function getProducts()
 {
@@ -240,10 +263,12 @@ function deleteProduct($id)
 function getSales()
 {
     global $conn;
-    $query = "SELECT s.*, s.qty as quantity, c.name as category_name, u.username as sold_by_username 
+    $query = "SELECT s.*, s.qty as quantity, c.name as category_name, u.username as sold_by_username,
+              t.transaction_number, t.total_amount as transaction_total, t.total_items as transaction_items
               FROM sales s 
               LEFT JOIN categories c ON s.category_id = c.id 
-              LEFT JOIN users u ON s.sold_by = u.id 
+              LEFT JOIN users u ON s.sold_by = u.id
+              LEFT JOIN transactions t ON s.transaction_id = t.id
               ORDER BY s.created_at DESC, s.id DESC";
     $query_run = mysqli_query($conn, $query);
     
@@ -321,13 +346,28 @@ function createSale()
     mysqli_begin_transaction($conn);
     
     try {
-        $query = "INSERT INTO sales (product_id, product_name, qty, price, total, category_id, sale_date, sold_by) 
-                  VALUES ('$product_id', '$product_name', '$qty', '$price', '$total', '$category_id', '$sale_date', " . 
+        $transaction_number = 'TXN-' . date('Ymd') . '-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
+        $total_amount = $qty * $price;
+        
+        $trans_query = "INSERT INTO transactions (transaction_number, total_amount, total_items, sold_by) 
+                        VALUES ('$transaction_number', '$total_amount', '$qty', " . 
+                        ($sold_by ? "'$sold_by'" : "NULL") . ")";
+        
+        if (!mysqli_query($conn, $trans_query)) {
+            throw new Exception('Failed to create transaction record');
+        }
+        
+        $transaction_id = mysqli_insert_id($conn);
+        
+        $query = "INSERT INTO sales (transaction_id, product_id, product_name, qty, price, total, category_id, sale_date, sold_by) 
+                  VALUES ('$transaction_id', '$product_id', '$product_name', '$qty', '$price', '$total', '$category_id', '$sale_date', " . 
                   ($sold_by ? "'$sold_by'" : "NULL") . ")";
         
         if (!mysqli_query($conn, $query)) {
             throw new Exception('Failed to create sale');
         }
+        
+        $sale_id = mysqli_insert_id($conn);
         
         $update_stock = "UPDATE products SET stock = stock - $qty WHERE id = '$product_id'";
         if (!mysqli_query($conn, $update_stock)) {
@@ -339,7 +379,9 @@ function createSale()
         $response = [
             'status' => 201,
             'message' => 'Sale created successfully',
-            'id' => mysqli_insert_id($conn)
+            'id' => $sale_id,
+            'transaction_number' => $transaction_number,
+            'transaction_id' => $transaction_id
         ];
         header("HTTP/1.0 201 Created");
         return json_encode($response);
