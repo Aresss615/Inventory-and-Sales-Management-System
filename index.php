@@ -113,6 +113,12 @@ if ($sales_sum_result) {
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="?page=pos" class="nav-link <?php echo $page === 'pos' ? 'active' : ''; ?>">
+                        <i class="fas fa-cash-register"></i>
+                        <span>POS</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="?page=reports" class="nav-link <?php echo $page === 'reports' ? 'active' : ''; ?>">
                         <i class="fas fa-chart-bar"></i>
                         <span>Sales Reports</span>
@@ -151,6 +157,7 @@ if ($sales_sum_result) {
                         'dashboard' => 'Dashboard',
                         'inventory' => 'Inventory Management',
                         'scanner' => 'Barcode Scanner',
+                        'pos' => 'Point of Sale',
                         'reports' => 'Sales Reports',
                         'categories' => 'Category Management',
                         'users' => 'User Management'
@@ -175,6 +182,8 @@ if ($sales_sum_result) {
                     <?php include 'views/inventory.php'; ?>
                 <?php elseif ($page === 'scanner'): ?>
                     <?php include 'views/scanner.php'; ?>
+                <?php elseif ($page === 'pos'): ?>
+                    <?php include 'views/pos.php'; ?>
                 <?php elseif ($page === 'reports'): ?>
                     <?php include 'views/reports.php'; ?>
                 <?php elseif ($page === 'categories' && in_array($current_user['role'], ['admin', 'manager'])): ?>
