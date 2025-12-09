@@ -1,4 +1,5 @@
 <?php require_once __DIR__ . '/../config/config.php'; ?>
+<?php displayNotification(); ?>
 <?php
 checkPermission('users_view');
 $can_create = hasPermission('users_create');

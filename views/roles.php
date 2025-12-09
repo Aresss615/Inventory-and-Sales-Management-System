@@ -1,4 +1,5 @@
 <?php require_once __DIR__ . '/../config/config.php'; ?>
+<?php displayNotification(); ?>
 <div class="controls" style="margin-bottom: 24px;">
     <button type="button" class="btn btn-primary" onclick="openRoleModal()">
         <i class="fas fa-plus"></i> Add New Role

@@ -1,3 +1,5 @@
+<?php if (function_exists('displayNotification')) displayNotification(); ?>
+
 <div class="controls">
     <button type="button" class="btn btn-primary" onclick="openAddModal()">
         <i class="fas fa-plus"></i> Add New Item
@@ -91,21 +93,24 @@ function applyFilters() {
 
     const filtered = allProducts.filter(item => {
         const matchSearch = searchValue === '' || 
-                          item.name.toLowerCase().includes(searchValue) || 
-                          item.sku.toLowerCase().includes(searchValue) || 
-                          item.barcode.toLowerCase().includes(searchValue);
-        
+                          (item.name || '').toLowerCase().includes(searchValue) || 
+                          (item.sku || '').toLowerCase().includes(searchValue) || 
+                          (item.barcode || '').toLowerCase().includes(searchValue);
+
         const matchCategory = categoryValue === '' || item.category_id == categoryValue;
-        
+
+        const stock = Number(item.stock) || 0;
+        const minStock = Number(item.minStock) || 0;
+
         let matchStock = true;
         if (stockValue === 'in-stock') {
-            matchStock = item.stock > item.minStock;
+            matchStock = stock > minStock;
         } else if (stockValue === 'low-stock') {
-            matchStock = item.stock > 0 && item.stock <= item.minStock;
+            matchStock = stock > 0 && stock <= minStock;
         } else if (stockValue === 'out-stock') {
-            matchStock = item.stock == 0;
+            matchStock = stock == 0;
         }
-        
+
         return matchSearch && matchCategory && matchStock;
     });
 
@@ -122,11 +127,13 @@ function renderTable(products) {
     
     let html = '';
     products.forEach(item => {
+        const stock = Number(item.stock) || 0;
+        const minStock = Number(item.minStock) || 0;
         let status, badge;
-        if (item.stock == 0) {
+        if (stock == 0) {
             status = 'Out of Stock';
             badge = 'badge-danger';
-        } else if (item.stock <= item.minStock) {
+        } else if (stock <= minStock) {
             status = 'Low Stock';
             badge = 'badge-warning';
         } else {
@@ -140,12 +147,12 @@ function renderTable(products) {
                 <td>${escapeHtml(item.name)}</td>
                 <td><code style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${escapeHtml(item.barcode)}</code></td>
                 <td>${escapeHtml(item.category_name || 'N/A')}</td>
-                <td><strong>${item.stock}</strong></td>
+                <td><strong>${stock}</strong></td>
                 <td>₱${parseFloat(item.price).toFixed(2)}</td>
                 <td><span class="badge ${badge}">${status}</span></td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn btn-sm btn-edit" onclick="openEditModal(${item.id}, '${escapeHtml(item.sku)}', '${escapeHtml(item.name)}', '${escapeHtml(item.barcode)}', ${item.category_id}, ${item.stock}, ${item.price}, ${item.minStock})">
+                        <button class="btn btn-sm btn-edit" onclick="openEditModal(${item.id}, '${escapeHtml(item.sku)}', '${escapeHtml(item.name)}', '${escapeHtml(item.barcode)}', ${item.category_id}, ${stock}, ${item.price}, ${minStock})">
                             <i class="fas fa-edit"></i> Edit
                         </button>
                         <?php if ($current_user['role'] === 'admin' || $current_user['role'] === 'manager'): ?>
