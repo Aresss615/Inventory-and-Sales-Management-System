@@ -1,4 +1,12 @@
 <?php displayNotification(); ?>
+<?php
+$outOfStockBarcodes = [];
+foreach ($products as $p) {
+    if (isset($p['stock']) && $p['stock'] <= 0) {
+        $outOfStockBarcodes[] = $p['barcode'];
+    }
+}
+?>
 <div class="pos-container">
     <div class="pos-products">
         <div class="pos-search">
@@ -61,6 +69,39 @@
         </div>
         <div class="modal-body">
             <div class="form-group">
+                <label>Subtotal</label>
+                <div style="font-size: 20px; font-weight: 600; margin: 5px 0;">
+                    <span id="checkoutSubtotal">₱0.00</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Discount Type</label>
+                <select id="discountType" class="input-field" onchange="calculateCheckout()">
+                    <option value="">No Discount</option>
+                    <option value="PWD">PWD (10%)</option>
+                    <option value="SENIOR">Senior Citizen (10%)</option>
+                </select>
+                <small id="discountAmount" style="margin-top: 5px; color: var(--success); font-weight: 600;"></small>
+            </div>
+            
+            <div class="form-group">
+                <label>Coupon Code</label>
+                <input type="text" id="couponCode" class="input-field" placeholder="Enter coupon code" oninput="calculateCheckout()">
+                <small id="couponDiscount" style="margin-top: 5px; color: var(--success); font-weight: 600;"></small>
+            </div>
+            
+            <div class="form-group">
+                <label>Payment Method</label>
+                <select id="paymentMethod" class="input-field" onchange="calculateCheckout()">
+                    <option value="cash">Cash</option>
+                    <option value="card">Card (+1% fee)</option>
+                    <option value="e-wallet">E-Wallet</option>
+                </select>
+                <small id="cardFee" style="margin-top: 5px; color: var(--danger); font-weight: 600;"></small>
+            </div>
+            
+            <div class="form-group">
                 <label>Total Amount</label>
                 <div style="font-size: 24px; font-weight: 700; color: var(--primary); margin: 10px 0;">
                     <span id="checkoutTotal">₱0.00</span>
@@ -68,7 +109,7 @@
             </div>
             <div class="form-group">
                 <label>Payment Amount</label>
-                <input type="number" id="paymentAmount" class="input-field" placeholder="Enter payment amount" step="0.01" min="0">
+                <input type="number" id="paymentAmount" class="input-field" placeholder="Enter payment amount" step="0.01" min="0" oninput="calculateChange()">
                 <small id="changeAmount" style="margin-top: 5px; color: var(--success); font-weight: 600;"></small>
             </div>
         </div>
@@ -81,6 +122,31 @@
 
 <script>
 let cart = [];
+const outOfStockBarcodes = <?php echo json_encode($outOfStockBarcodes); ?> || [];
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'pos-toast';
+    toast.textContent = message;
+    Object.assign(toast.style, {
+        position: 'fixed',
+        right: '20px',
+        top: '20px',
+        background: 'rgba(0,0,0,0.8)',
+        color: '#fff',
+        padding: '10px 14px',
+        borderRadius: '6px',
+        zIndex: 9999,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        fontSize: '14px'
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s ease';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
 
 function addToCart(id, name, price, maxStock) {
     const existing = cart.find(item => item.id === id);
@@ -179,35 +245,106 @@ function checkout() {
         return;
     }
     
-    const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    document.getElementById('checkoutTotal').textContent = '₱' + total.toFixed(2);
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    document.getElementById('checkoutSubtotal').textContent = '₱' + subtotal.toFixed(2);
+    document.getElementById('checkoutTotal').textContent = '₱' + subtotal.toFixed(2);
+    document.getElementById('discountType').value = '';
+    document.getElementById('couponCode').value = '';
+    document.getElementById('paymentMethod').value = 'cash';
     document.getElementById('paymentAmount').value = '';
+    document.getElementById('discountAmount').textContent = '';
+    document.getElementById('couponDiscount').textContent = '';
+    document.getElementById('cardFee').textContent = '';
     document.getElementById('changeAmount').textContent = '';
     document.getElementById('checkoutModal').classList.add('active');
     document.getElementById('paymentAmount').focus();
 }
 
+function calculateCheckout() {
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    let total = subtotal;
+    
+    const discountType = document.getElementById('discountType').value;
+    let discountAmount = 0;
+    if (discountType === 'PWD' || discountType === 'SENIOR') {
+        discountAmount = subtotal * 0.10;
+        total -= discountAmount;
+        document.getElementById('discountAmount').textContent = `Discount: -₱${discountAmount.toFixed(2)}`;
+    } else {
+        document.getElementById('discountAmount').textContent = '';
+    }
+    
+    const couponCode = document.getElementById('couponCode').value.trim();
+    let couponDiscount = 0;
+    if (couponCode) {
+        const coupons = {
+            'WELCOME10': { type: 'percentage', value: 10, min: 500, max: 500 },
+            'SAVE50': { type: 'fixed', value: 50, min: 200 },
+            'SAVE100': { type: 'fixed', value: 100, min: 500 },
+            'MEGA20': { type: 'percentage', value: 20, min: 1000, max: 1000 },
+            'NEWYEAR15': { type: 'percentage', value: 15, min: 300, max: 750 }
+        };
+        
+        const coupon = coupons[couponCode.toUpperCase()];
+        if (coupon && subtotal >= coupon.min) {
+            if (coupon.type === 'percentage') {
+                couponDiscount = total * (coupon.value / 100);
+                if (coupon.max && couponDiscount > coupon.max) {
+                    couponDiscount = coupon.max;
+                }
+            } else {
+                couponDiscount = coupon.value;
+            }
+            total -= couponDiscount;
+            document.getElementById('couponDiscount').textContent = `Coupon: -₱${couponDiscount.toFixed(2)}`;
+        } else if (coupon && subtotal < coupon.min) {
+            document.getElementById('couponDiscount').textContent = `Min. purchase: ₱${coupon.min.toFixed(2)}`;
+            document.getElementById('couponDiscount').style.color = 'var(--danger)';
+        } else {
+            document.getElementById('couponDiscount').textContent = 'Invalid coupon code';
+            document.getElementById('couponDiscount').style.color = 'var(--danger)';
+        }
+    } else {
+        document.getElementById('couponDiscount').textContent = '';
+    }
+    
+    const paymentMethod = document.getElementById('paymentMethod').value;
+    let cardFee = 0;
+    if (paymentMethod === 'card') {
+        cardFee = total * 0.01;
+        total += cardFee;
+        document.getElementById('cardFee').textContent = `Card Fee: +₱${cardFee.toFixed(2)}`;
+    } else {
+        document.getElementById('cardFee').textContent = '';
+    }
+    
+    document.getElementById('checkoutTotal').textContent = '₱' + total.toFixed(2);
+    calculateChange();
+}
+
+function calculateChange() {
+    const total = parseFloat(document.getElementById('checkoutTotal').textContent.replace('₱', '').replace(',', ''));
+    const payment = parseFloat(document.getElementById('paymentAmount').value);
+    const changeDisplay = document.getElementById('changeAmount');
+    
+    if (payment && payment > 0) {
+        const change = payment - total;
+        if (change >= 0) {
+            changeDisplay.textContent = `Change: ₱${change.toFixed(2)}`;
+            changeDisplay.style.color = 'var(--success)';
+        } else {
+            changeDisplay.textContent = `Insufficient: ₱${Math.abs(change).toFixed(2)} short`;
+            changeDisplay.style.color = 'var(--danger)';
+        }
+    } else {
+        changeDisplay.textContent = '';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const paymentInput = document.getElementById('paymentAmount');
     if (paymentInput) {
-        paymentInput.addEventListener('input', function() {
-            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            const payment = parseFloat(this.value);
-            const changeDisplay = document.getElementById('changeAmount');
-            
-            if (payment && payment > 0) {
-                const change = payment - total;
-                if (change >= 0) {
-                    changeDisplay.textContent = `Change: ₱${change.toFixed(2)}`;
-                    changeDisplay.style.color = 'var(--success)';
-                } else {
-                    changeDisplay.textContent = `Insufficient: ₱${Math.abs(change).toFixed(2)} short`;
-                    changeDisplay.style.color = 'var(--danger)';
-                }
-            } else {
-                changeDisplay.textContent = '';
-            }
-        });
+        paymentInput.addEventListener('input', calculateChange);
     }
 });
 
@@ -216,7 +353,7 @@ function closeCheckoutModal() {
 }
 
 function confirmCheckout() {
-    const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const total = parseFloat(document.getElementById('checkoutTotal').textContent.replace('₱', '').replace(',', ''));
     const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
     
     if (!paymentAmount || paymentAmount <= 0) {
@@ -228,6 +365,10 @@ function confirmCheckout() {
         alert('Payment amount is less than total');
         return;
     }
+    
+    const discountType = document.getElementById('discountType').value || null;
+    const couponCode = document.getElementById('couponCode').value.trim() || null;
+    const paymentMethod = document.getElementById('paymentMethod').value;
     
     const checkoutBtn = document.getElementById('confirmCheckoutBtn');
     checkoutBtn.disabled = true;
@@ -242,7 +383,13 @@ function confirmCheckout() {
     fetch('<?php echo BASE_URL; ?>/api/checkout.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: items })
+        body: JSON.stringify({ 
+            items: items,
+            discount_type: discountType,
+            coupon_code: couponCode,
+            payment_method: paymentMethod,
+            payment_received: paymentAmount
+        })
     })
     .then(response => response.json())
     .then(data => {
@@ -250,7 +397,7 @@ function confirmCheckout() {
             cart = [];
             renderCart();
             closeCheckoutModal();
-            window.location.href = '?page=pos&checkout_success=1&change=' + (paymentAmount - total).toFixed(2);
+            window.location.href = '?page=pos&checkout_success=1&change=' + data.change_amount.toFixed(2);
         } else {
             alert(data.message || 'Checkout failed');
             checkoutBtn.disabled = false;
@@ -297,5 +444,15 @@ document.getElementById('posSearch').addEventListener('input', function(e) {
             card.style.display = 'none';
         }
     });
+
+    if (!foundByBarcode && search.length > 5) {
+        const normalized = search.toLowerCase();
+        const outLower = outOfStockBarcodes.map(b => String(b).toLowerCase());
+        if (outLower.includes(normalized)) {
+            showToast('Product is out of stock');
+            e.target.value = '';
+            document.querySelectorAll('.pos-card').forEach(c => c.style.display = 'block');
+        }
+    }
 });
 </script>

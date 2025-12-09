@@ -3,6 +3,11 @@ session_start();
 require __DIR__ . "/../config/database.php";
 require __DIR__ . "/../config/auth.php";
 
+require __DIR__ . "/../config/config.php";
+
+$redirect_base = rtrim(defined('BASE_URL') ? BASE_URL : '', '/');
+$app_index = $redirect_base === '' ? '/index.php' : $redirect_base . '/index.php';
+
 checkLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -29,7 +34,7 @@ if ($action === 'save') {
         $check = "SELECT * FROM products WHERE barcode = '$barcode' AND id != '$id'";
         $check_run = mysqli_query($conn, $check);
         if (mysqli_num_rows($check_run) > 0) {
-            header('Location: index.php?page=inventory&error=barcode_exists');
+            header('Location: ' . $app_index . '?page=inventory&error=barcode_exists');
             exit;
         }
         
@@ -37,19 +42,19 @@ if ($action === 'save') {
                   category_id='$category_id', stock='$stock', price='$price', minStock='$minStock' 
                   WHERE id='$id'";
         mysqli_query($conn, $query);
-        header('Location: index.php?page=inventory&success=updated');
+        header('Location: ' . $app_index . '?page=inventory&success=updated');
     } else {
         $check = "SELECT * FROM products WHERE barcode = '$barcode'";
         $check_run = mysqli_query($conn, $check);
         if (mysqli_num_rows($check_run) > 0) {
-            header('Location: index.php?page=inventory&error=barcode_exists');
+            header('Location: ' . $app_index . '?page=inventory&error=barcode_exists');
             exit;
         }
         
         $query = "INSERT INTO products (sku, name, barcode, category_id, stock, price, minStock, created_by) 
                   VALUES ('$sku', '$name', '$barcode', '$category_id', '$stock', '$price', '$minStock', '$created_by')";
         mysqli_query($conn, $query);
-        header('Location: index.php?page=inventory&success=created');
+        header('Location: ' . $app_index . '?page=inventory&success=created');
     }
 } elseif ($action === 'delete') {
     checkRole(['admin', 'manager']);
@@ -57,7 +62,7 @@ if ($action === 'save') {
     $id = mysqli_real_escape_string($conn, $_POST['id']);
     $query = "DELETE FROM products WHERE id='$id'";
     mysqli_query($conn, $query);
-    header('Location: index.php?page=inventory&success=deleted');
+    header('Location: ' . $app_index . '?page=inventory&success=deleted');
 }
 
 exit;

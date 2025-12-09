@@ -2,6 +2,10 @@
 session_start();
 require __DIR__ . "/../config/database.php";
 require __DIR__ . "/../config/auth.php";
+require __DIR__ . "/../config/config.php";
+
+$redirect_base = rtrim(defined('BASE_URL') ? BASE_URL : '', '/');
+$app_index = $redirect_base === '' ? '/index.php' : $redirect_base . '/index.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = isset($_POST['action']) ? $_POST['action'] : 'save';
@@ -11,16 +15,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = mysqli_real_escape_string($conn, $_POST['id']);
         
         if ($id == $_SESSION['user_id']) {
-            header('Location: index.php?page=users&error=cannot_delete_self');
+            header('Location: ' . $app_index . '?page=users&error=cannot_delete_self');
             exit;
         }
         
         $query = "DELETE FROM users WHERE id = '$id'";
-        if (mysqli_query($conn, $query)) {
-            header('Location: index.php?page=users&success=deleted');
-        } else {
-            header('Location: index.php?page=users&error=delete_failed');
-        }
+            if (mysqli_query($conn, $query)) {
+                header('Location: ' . $app_index . '?page=users&success=deleted');
+            } else {
+                header('Location: ' . $app_index . '?page=users&error=delete_failed');
+            }
         exit;
     } else {
         $id = isset($_POST['id']) && !empty($_POST['id']) ? mysqli_real_escape_string($conn, $_POST['id']) : null;
@@ -50,13 +54,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $query .= " WHERE id='$id'";
             
             if (mysqli_query($conn, $query)) {
-                header('Location: index.php?page=users&success=updated');
+                header('Location: ' . $app_index . '?page=users&success=updated');
             } else {
-                header('Location: index.php?page=users&error=update_failed');
+                header('Location: ' . $app_index . '?page=users&error=update_failed');
             }
         } else {
             if (!$password) {
-                header('Location: index.php?page=users&error=password_required');
+                header('Location: ' . $app_index . '?page=users&error=password_required');
                 exit;
             }
             
@@ -72,16 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $query = "INSERT INTO users (username, password, email, full_name, role_id, is_active, created_by) 
                       VALUES ('$username', '$hashed_password', '$email', '$full_name', '$role_id', '$is_active', '$created_by')";
             
-            if (mysqli_query($conn, $query)) {
-                header('Location: index.php?page=users&success=created');
+                if (mysqli_query($conn, $query)) {
+                header('Location: ' . $app_index . '?page=users&success=created');
             } else {
-                header('Location: index.php?page=users&error=create_failed');
+                header('Location: ' . $app_index . '?page=users&error=create_failed');
             }
         }
         exit;
     }
 }
 
-header('Location: index.php?page=users');
+header('Location: ' . $app_index . '?page=users');
 exit;
 ?>

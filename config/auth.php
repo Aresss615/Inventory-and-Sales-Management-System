@@ -4,8 +4,22 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require __DIR__ . "/database.php";
 
+function isApiRequest() {
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+    if (strpos($uri, '/api/') !== false) return true;
+    if (stripos($accept, 'application/json') !== false) return true;
+    return false;
+}
+
 function checkLogin() {
     if (!isset($_SESSION['user_id'])) {
+        if (isApiRequest()) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 401, 'message' => 'Unauthorized']);
+            exit;
+        }
         header('Location: login.php');
         exit;
     }
@@ -14,6 +28,12 @@ function checkLogin() {
 function checkRole($allowed_roles = []) {
     checkLogin();
     if (!empty($allowed_roles) && !in_array($_SESSION['user_role'], $allowed_roles)) {
+        if (isApiRequest()) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 403, 'message' => 'Forbidden']);
+            exit;
+        }
         header('Location: index.php?error=unauthorized');
         exit;
     }
@@ -22,6 +42,12 @@ function checkRole($allowed_roles = []) {
 function checkPermission($permission_name) {
     checkLogin();
     if (!hasPermission($permission_name)) {
+        if (isApiRequest()) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 403, 'message' => 'Forbidden']);
+            exit;
+        }
         header('Location: index.php?error=unauthorized');
         exit;
     }
@@ -152,6 +178,22 @@ function canViewInventory() {
 
 function canViewDashboard() {
     return hasPermission('dashboard_view');
+}
+
+function canViewCoupons() {
+    return hasPermission('coupons_view');
+}
+
+function canCreateCoupons() {
+    return hasPermission('coupons_create');
+}
+
+function canEditCoupons() {
+    return hasPermission('coupons_edit');
+}
+
+function canDeleteCoupons() {
+    return hasPermission('coupons_delete');
 }
 
 ?>

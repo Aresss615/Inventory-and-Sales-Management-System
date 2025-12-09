@@ -1,7 +1,17 @@
 <?php
 
-define('BASE_PATH', '/inventory/Inventory-and-Sales-Management-System');
-define('BASE_URL', 'http://' . $_SERVER['HTTP_HOST'] . BASE_PATH);
-define('API_URL', BASE_URL . '/api');
+$scriptPath = str_replace('\\', '/', dirname(dirname(__FILE__)));
+$docRoot = str_replace('\\', '/', rtrim($_SERVER['DOCUMENT_ROOT'], '/\\'));
+
+if (strpos($scriptPath, $docRoot) === 0) {
+	$basePath = substr($scriptPath, strlen($docRoot));
+	$basePath = $basePath === '' ? '/' : $basePath;
+} else {
+	$basePath = '/' . trim(basename($scriptPath));
+}
+
+define('BASE_PATH', $basePath);
+define('BASE_URL', $basePath);
+define('API_URL', rtrim($basePath, '/') . '/api');
 
 ?>

@@ -2,6 +2,10 @@
 session_start();
 require __DIR__ . "/../config/database.php";
 require __DIR__ . "/../config/auth.php";
+require __DIR__ . "/../config/config.php";
+
+$redirect_base = rtrim(defined('BASE_URL') ? BASE_URL : '', '/');
+$app_index = $redirect_base === '' ? '/index.php' : $redirect_base . '/index.php';
 
 checkPermission('roles_view');
 
@@ -16,8 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $check_result = mysqli_query($conn, $check_query);
         $role = mysqli_fetch_assoc($check_result);
         
-        if ($role['is_system']) {
-            header('Location: index.php?page=roles&error=cannot_delete_system_role');
+            if ($role['is_system']) {
+                header('Location: ' . $app_index . '?page=roles&error=cannot_delete_system_role');
             exit;
         }
         
@@ -25,16 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user_result = mysqli_query($conn, $user_check);
         $user_data = mysqli_fetch_assoc($user_result);
         
-        if ($user_data['user_count'] > 0) {
-            header('Location: index.php?page=roles&error=role_has_users');
+            if ($user_data['user_count'] > 0) {
+            header('Location: ' . $app_index . '?page=roles&error=role_has_users');
             exit;
         }
         
         $query = "DELETE FROM roles WHERE id = '$id'";
         if (mysqli_query($conn, $query)) {
-            header('Location: index.php?page=roles&success=deleted');
+            header('Location: ' . $app_index . '?page=roles&success=deleted');
         } else {
-            header('Location: index.php?page=roles&error=delete_failed');
+            header('Location: ' . $app_index . '?page=roles&error=delete_failed');
         }
         exit;
         
@@ -55,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $role = mysqli_fetch_assoc($check_result);
             
             if ($role['is_system']) {
-                header('Location: index.php?page=roles&error=cannot_edit_system_role');
+                header('Location: ' . $app_index . '?page=roles&error=cannot_edit_system_role');
                 exit;
             }
             
@@ -68,9 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $permission_id = mysqli_real_escape_string($conn, $permission_id);
                     mysqli_query($conn, "INSERT INTO role_permissions (role_id, permission_id) VALUES ('$id', '$permission_id')");
                 }
-                header('Location: index.php?page=roles&success=updated');
+                header('Location: ' . $app_index . '?page=roles&success=updated');
             } else {
-                header('Location: index.php?page=roles&error=update_failed');
+                header('Location: ' . $app_index . '?page=roles&error=update_failed');
             }
         } else {
             $query = "INSERT INTO roles (name, display_name, description, is_system) 
@@ -83,9 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $permission_id = mysqli_real_escape_string($conn, $permission_id);
                     mysqli_query($conn, "INSERT INTO role_permissions (role_id, permission_id) VALUES ('$role_id', '$permission_id')");
                 }
-                header('Location: index.php?page=roles&success=created');
+                header('Location: ' . $app_index . '?page=roles&success=created');
             } else {
-                header('Location: index.php?page=roles&error=create_failed');
+                header('Location: ' . $app_index . '?page=roles&error=create_failed');
             }
         }
         exit;

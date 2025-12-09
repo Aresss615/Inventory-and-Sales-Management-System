@@ -45,7 +45,7 @@ if (isset($_GET['barcode']) && !empty($_GET['barcode'])) {
             </div>
             <div class="detail-item">
                 <div class="detail-label">Category</div>
-                <div class="detail-value"><?php echo htmlspecialchars($scannedProduct['category']); ?></div>
+                <div class="detail-value"><?php echo htmlspecialchars($scannedProduct['category'] ?? $scannedProduct['category_name'] ?? 'Uncategorized'); ?></div>
             </div>
             <div class="detail-item">
                 <div class="detail-label">Stock Quantity</div>
