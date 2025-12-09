@@ -2,11 +2,47 @@
 
 header('Access-Control-Allow-Origin:*');
 header('Content-Type: application/json');
-header('Access-Control-Allow-Method: GET, POST, PUT, DELETE');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Request-With');
+
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(0);
+
+ob_start();
+
+register_shutdown_function(function() {
+    $error = error_get_last();
+    $content = ob_get_clean();
+
+    if ($error) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+        $msg = isset($error['message']) ? $error['message'] : 'Shutdown error';
+        echo json_encode(['status' => 500, 'message' => 'Internal Server Error', 'error' => $msg]);
+        return;
+    }
+
+    if (trim($content) !== '') {
+        $decoded = json_decode($content);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 500, 'message' => 'Internal Server Error', 'debug' => substr($content, 0, 2000)]);
+            return;
+        } else {
+            echo $content;
+            return;
+        }
+    }
+});
 
 require __DIR__ . "/../config/auth.php";
 require __DIR__ . "/../config/database.php";
+
+if (function_exists('mysqli_report')) {
+    mysqli_report(MYSQLI_REPORT_OFF);
+}
 
 if (!isLoggedIn()) {
     http_response_code(401);
@@ -147,8 +183,17 @@ function deleteCategory($id) {
     
     $check = "SELECT COUNT(*) as count FROM products WHERE category_id = '$id'";
     $check_result = mysqli_query($conn, $check);
+    if (!$check_result) {
+        http_response_code(500);
+        echo json_encode(['status' => 500, 'message' => 'Failed to verify category products']);
+        return;
+    }
     $row = mysqli_fetch_assoc($check_result);
-    
+    if (!$row) {
+        http_response_code(500);
+        echo json_encode(['status' => 500, 'message' => 'Failed to read product count']);
+        return;
+    }
     if ($row['count'] > 0) {
         http_response_code(409);
         echo json_encode([
@@ -157,12 +202,51 @@ function deleteCategory($id) {
         ]);
         return;
     }
+
+    $checkSales = "SELECT COUNT(*) as count FROM sales WHERE category_id = '$id'";
+    $checkSalesResult = mysqli_query($conn, $checkSales);
+    if (!$checkSalesResult) {
+        http_response_code(500);
+        echo json_encode(['status' => 500, 'message' => 'Failed to verify category references in sales']);
+        return;
+    }
+    $salesRow = mysqli_fetch_assoc($checkSalesResult);
+    $salesCount = $salesRow['count'] ?? 0;
+
+    $force = isset($_GET['force']) && in_array(strtolower($_GET['force']), ['1', 'true', 'yes'], true);
+
+    if ($salesCount > 0 && !$force) {
+        http_response_code(409);
+        echo json_encode([
+            'status' => 409,
+            'message' => 'Cannot delete category: referenced by sales records',
+            'references' => ['sales' => (int)$salesCount]
+        ]);
+        return;
+    }
+
+    if ($salesCount > 0 && $force) {
+        mysqli_begin_transaction($conn);
+        $delSales = "DELETE FROM sales WHERE category_id = '$id'";
+        if (!mysqli_query($conn, $delSales)) {
+            mysqli_rollback($conn);
+            http_response_code(500);
+            echo json_encode(['status' => 500, 'message' => 'Failed to delete related sales records']);
+            return;
+        }
+    }
     
     $query = "DELETE FROM categories WHERE id = '$id'";
     if (mysqli_query($conn, $query)) {
+        if ($salesCount > 0 && $force) {
+            mysqli_commit($conn);
+        }
         http_response_code(200);
         echo json_encode(['status' => 200, 'message' => 'Category deleted successfully']);
     } else {
+        if ($salesCount > 0 && $force) {
+            mysqli_rollback($conn);
+        }
         http_response_code(500);
         echo json_encode(['status' => 500, 'message' => 'Failed to delete category']);
     }

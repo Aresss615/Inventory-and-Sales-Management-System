@@ -28,28 +28,45 @@
 </div>
 
 <div id="categoryModal" class="modal">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content" style="max-width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
         <div class="modal-header">
             <h2 class="modal-title" id="categoryModalTitle">Add New Category</h2>
             <button class="modal-close" onclick="closeCategoryModal()">&times;</button>
         </div>
-        <form id="categoryForm" onsubmit="saveCategory(event)">
-            <div style="padding: 20px;">
+        <form id="categoryForm" onsubmit="saveCategory(event)" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
                 <input type="hidden" id="categoryId">
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label for="categoryName">Category Name</label>
                     <input type="text" id="categoryName" placeholder="e.g., Electronics" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label for="categoryDescription">Description (Optional)</label>
                     <textarea id="categoryDescription" rows="2" placeholder="Brief description of the category"></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex-shrink: 0;">
                 <button type="button" class="btn btn-secondary" onclick="closeCategoryModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Category</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div id="deleteCategoryModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Delete Category</h2>
+            <button class="modal-close" onclick="closeDeleteCategoryModal()">&times;</button>
+        </div>
+        <div style="padding: 20px;">
+            <p style="color: #64748b; margin-bottom: 0;">Are you sure you want to delete the category "<strong id="deleteCategoryName"></strong>"? This action cannot be undone.</p>
+            <input type="hidden" id="deleteCategoryId">
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeDeleteCategoryModal()">Cancel</button>
+            <button type="button" class="btn btn-delete" onclick="confirmDeleteCategory()">Delete</button>
+        </div>
     </div>
 </div>
 
@@ -138,37 +155,46 @@ function saveCategory(event) {
         if (data.status === 201 || data.status === 200) {
             closeCategoryModal();
             loadCategories();
-            alert(data.message);
+            showNotification(data.message, 'success');
         } else {
-            alert(data.message || 'Error saving category');
+            showNotification(data.message || 'Error saving category', 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error saving category');
+        showNotification('Error saving category', 'error');
     });
 }
 
 function deleteCategory(id, name) {
-    if (!confirm(`Are you sure you want to delete the category "${name}"? This action cannot be undone.`)) {
-        return;
-    }
+    document.getElementById('deleteCategoryId').value = id;
+    document.getElementById('deleteCategoryName').textContent = name;
+    document.getElementById('deleteCategoryModal').style.display = 'flex';
+}
+
+function closeDeleteCategoryModal() {
+    document.getElementById('deleteCategoryModal').style.display = 'none';
+}
+
+function confirmDeleteCategory() {
+    const id = document.getElementById('deleteCategoryId').value;
     
-    fetch(`${apiUrl}/categories.php?id=${id}`, {
+    fetch(`${apiUrl}/categories.php?id=${id}&force=1`, {
         method: 'DELETE'
     })
     .then(response => response.json())
     .then(data => {
         if (data.status === 200) {
+            closeDeleteCategoryModal();
             loadCategories();
-            alert(data.message);
+            showNotification(data.message, 'success');
         } else {
-            alert(data.message || 'Error deleting category');
+            showNotification(data.message || 'Error deleting category', 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error deleting category');
+        showNotification('Error deleting category', 'error');
     });
 }
 
