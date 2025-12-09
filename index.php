@@ -14,6 +14,91 @@ $category = isset($_GET['category']) && $_GET['category'] !== '' ? $_GET['catego
 $stock = isset($_GET['stock']) && $_GET['stock'] !== '' ? $_GET['stock'] : '';
 $reportPeriod = isset($_GET['period']) ? $_GET['period'] : 'daily';
 
+if ($page === 'pos' && isset($_GET['checkout_success']) && isset($_GET['change'])) {
+    $change = floatval($_GET['change']);
+    $_SESSION['notification'] = [
+        'message' => 'Transaction successful! Change: ₱' . number_format($change, 2),
+        'type' => 'success'
+    ];
+    header('Location: ?page=pos');
+    exit;
+}
+
+if (isset($_GET['success']) || isset($_GET['error'])) {
+    $success = isset($_GET['success']) ? $_GET['success'] : null;
+    $error = isset($_GET['error']) ? $_GET['error'] : null;
+
+    if ($success) {
+        switch ($success) {
+            case 'created':
+                setNotification('Created successfully', 'success');
+                break;
+            case 'updated':
+                setNotification('Updated successfully', 'success');
+                break;
+            case 'deleted':
+                setNotification('Deleted successfully', 'success');
+                break;
+            case 'checkout':
+                setNotification('Checkout completed', 'success');
+                break;
+            default:
+                setNotification('Operation completed', 'success');
+                break;
+        }
+    }
+
+    if ($error) {
+        switch ($error) {
+            case 'barcode_exists':
+                setNotification('Barcode already exists', 'error');
+                break;
+            case 'cannot_delete_self':
+                setNotification('You cannot delete your own account', 'error');
+                break;
+            case 'delete_failed':
+                setNotification('Failed to delete', 'error');
+                break;
+            case 'create_failed':
+                setNotification('Failed to create', 'error');
+                break;
+            case 'update_failed':
+                setNotification('Failed to update', 'error');
+                break;
+            case 'password_required':
+                setNotification('Password is required', 'error');
+                break;
+            case 'user_exists':
+                setNotification('User already exists', 'error');
+                break;
+            case 'cannot_delete_system_role':
+                setNotification('Cannot delete a system role', 'error');
+                break;
+            case 'role_has_users':
+                setNotification('Role has assigned users and cannot be deleted', 'error');
+                break;
+            case 'cannot_edit_system_role':
+                setNotification('Cannot edit a system role', 'error');
+                break;
+            default:
+                setNotification('An error occurred', 'error');
+                break;
+        }
+    }
+
+    $preserve = [];
+    foreach ($_GET as $k => $v) {
+        if ($k === 'success' || $k === 'error') continue;
+        $preserve[$k] = $v;
+    }
+
+    $path = $_SERVER['PHP_SELF'];
+    $qs = http_build_query($preserve);
+    $location = $path . ($qs ? ('?' . $qs) : '');
+    header('Location: ' . $location);
+    exit;
+}
+
 $categories = [];
 $cat_result = mysqli_query($conn, "SELECT * FROM categories ORDER BY name ASC");
 if ($cat_result) {
@@ -218,10 +303,10 @@ if ($top_products_result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory & Sales Management System</title>
+    <title>InvSys</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <link rel="stylesheet" href="assets/css/styles.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/styles.css?v=<?php echo time(); ?>">
 </head>
 <body>
     <div class="container">
@@ -255,17 +340,27 @@ if ($top_products_result) {
                         <span>POS</span>
                     </a>
                 </li>
+                <?php if (canViewReports()): ?>
                 <li class="nav-item">
                     <a href="?page=reports" class="nav-link <?php echo $page === 'reports' ? 'active' : ''; ?>">
                         <i class="fas fa-chart-bar"></i>
                         <span>Sales Reports</span>
                     </a>
                 </li>
+                <?php endif; ?>
                 <?php if (canViewCategories()): ?>
                 <li class="nav-item">
                     <a href="?page=categories" class="nav-link <?php echo $page === 'categories' ? 'active' : ''; ?>">
                         <i class="fas fa-tags"></i>
                         <span>Categories</span>
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if (canViewCoupons()): ?>
+                <li class="nav-item">
+                    <a href="?page=coupons" class="nav-link <?php echo $page === 'coupons' ? 'active' : ''; ?>">
+                        <i class="fas fa-ticket-alt"></i>
+                        <span>Coupons</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -287,10 +382,10 @@ if ($top_products_result) {
                 <?php endif; ?>
             </ul>
             <div class="sidebar-footer">
-                <a href="logout.php" class="nav-link">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
+                <div class="copyright">
+                    <p>&copy; <?php echo date('Y'); ?> InvSys</p>
+                    <p>All rights reserved</p>
+                </div>
             </div>
         </div>
 
@@ -305,18 +400,34 @@ if ($top_products_result) {
                         'pos' => 'Point of Sale',
                         'reports' => 'Sales Reports',
                         'categories' => 'Category Management',
+                        'coupons' => 'Coupon Management',
                         'users' => 'User Management',
-                        'roles' => 'Roles & Permissions'
+                        'roles' => 'Roles & Permissions',
+                        'profile' => 'My Profile'
                     ];
                     echo $titles[$page] ?? 'Dashboard';
                     ?>
                 </div>
                 <div class="header-actions">
-                    <div class="user-profile">
-                        <div class="user-avatar"><?php echo strtoupper(substr($current_user['full_name'], 0, 2)); ?></div>
-                        <div>
-                            <div style="font-weight: 500;"><?php echo htmlspecialchars($current_user['full_name']); ?></div>
-                            <div style="font-size: 12px; color: #64748b;"><?php echo htmlspecialchars($current_user['role_display'] ?? 'User'); ?></div>
+                    <div class="user-profile-dropdown">
+                        <div class="user-profile" onclick="toggleProfileDropdown()">
+                            <div class="user-avatar"><?php echo strtoupper(substr($current_user['full_name'], 0, 2)); ?></div>
+                            <div>
+                                <div style="font-weight: 500;"><?php echo htmlspecialchars($current_user['full_name']); ?></div>
+                                <div style="font-size: 12px; color: #64748b;"><?php echo htmlspecialchars($current_user['role_display'] ?? 'User'); ?></div>
+                            </div>
+                            <i class="fas fa-chevron-down dropdown-icon"></i>
+                        </div>
+                        <div class="dropdown-menu" id="profileDropdown">
+                            <a href="?page=profile" class="dropdown-item">
+                                <i class="fas fa-user-circle"></i>
+                                <span>My Profile</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="logout.php" class="dropdown-item">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Logout</span>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -329,26 +440,19 @@ if ($top_products_result) {
                 <?php elseif ($page === 'scanner'): ?>
                     <?php include 'views/scanner.php'; ?>
                 <?php elseif ($page === 'pos'): ?>
-                    <?php 
-                    if (isset($_GET['checkout_success']) && isset($_GET['change'])) {
-                        $change = floatval($_GET['change']);
-                        $_SESSION['notification'] = [
-                            'message' => 'Transaction successful! Change: ₱' . number_format($change, 2),
-                            'type' => 'success'
-                        ];
-                        header('Location: ?page=pos');
-                        exit;
-                    }
-                    include 'views/pos.php'; 
-                    ?>
-                <?php elseif ($page === 'reports'): ?>
+                    <?php include 'views/pos.php'; ?>
+                <?php elseif ($page === 'reports' && canViewReports()): ?>
                     <?php include 'views/reports.php'; ?>
                 <?php elseif ($page === 'categories' && canViewCategories()): ?>
                     <?php include 'views/categories.php'; ?>
+                <?php elseif ($page === 'coupons' && canViewCoupons()): ?>
+                    <?php include 'views/coupons.php'; ?>
                 <?php elseif ($page === 'users' && canViewUsers()): ?>
                     <?php include 'views/users.php'; ?>
                 <?php elseif ($page === 'roles' && canViewRoles()): ?>
                     <?php include 'views/roles.php'; ?>
+                <?php elseif ($page === 'profile'): ?>
+                    <?php include 'views/profile.php'; ?>
                 <?php else: ?>
                     <?php include 'views/dashboard.php'; ?>
                 <?php endif; ?>
@@ -358,28 +462,28 @@ if ($top_products_result) {
     </div>
 
     <div id="itemModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
             <div class="modal-header">
                 <h2 class="modal-title" id="modalTitle">Add New Item</h2>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            <form method="post" action="<?php echo API_URL; ?>/actions.php">
-                <div style="padding: 20px;">
+            <form method="post" action="<?php echo API_URL; ?>/actions.php" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <div style="padding: 20px; overflow-y: auto; flex: 1;">
                     <input type="hidden" name="action" value="save" id="formAction">
                     <input type="hidden" name="id" id="formId">
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formSku">SKU</label>
                         <input type="text" name="sku" id="formSku" placeholder="e.g., SKU001" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formName">Product Name</label>
                         <input type="text" name="name" id="formName" placeholder="Enter product name" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formBarcode">Barcode</label>
                         <input type="text" name="barcode" id="formBarcode" placeholder="Enter barcode" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formCategory">Category</label>
                         <select name="category" id="formCategory" required>
                             <option value="">Select Category</option>
@@ -388,20 +492,20 @@ if ($top_products_result) {
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formStock">Stock Quantity</label>
                         <input type="number" name="stock" id="formStock" placeholder="0" min="0" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formPrice">Unit Price</label>
                         <input type="number" name="price" id="formPrice" placeholder="0.00" min="0" step="0.01" required>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="margin-bottom: 16px;">
                         <label for="formMinStock">Minimum Stock Level</label>
                         <input type="number" name="minStock" id="formMinStock" placeholder="10" min="0" required>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" style="flex-shrink: 0;">
                     <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Item</button>
                 </div>
@@ -616,6 +720,71 @@ if ($top_products_result) {
             }
         });
         <?php endif; ?>
+    </script>
+    <script>
+        function toggleProfileDropdown() {
+            const dropdown = document.getElementById('profileDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        window.onclick = function(event) {
+            if (!event.target.closest('.user-profile-dropdown')) {
+                const dropdowns = document.getElementsByClassName('dropdown-menu');
+                for (let i = 0; i < dropdowns.length; i++) {
+                    dropdowns[i].classList.remove('show');
+                }
+            }
+        }
+    </script>
+    <script>
+        function showNotification(message, type = 'info', timeout = 3500) {
+            let container = document.getElementById('notificationContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'notificationContainer';
+                container.style.position = 'fixed';
+                container.style.top = '20px';
+                container.style.right = '20px';
+                container.style.zIndex = '99999';
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.alignItems = 'flex-end';
+                document.body.appendChild(container);
+            }
+
+            const note = document.createElement('div');
+            note.className = 'notification ' + type;
+            note.textContent = message;
+            note.style.marginTop = '8px';
+            note.style.padding = '10px 14px';
+            note.style.borderRadius = '8px';
+            note.style.minWidth = '200px';
+            note.style.boxShadow = '0 6px 18px rgba(2,6,23,0.08)';
+            note.style.fontWeight = '600';
+            note.style.color = '#0f172a';
+            note.style.opacity = '1';
+            note.style.transition = 'opacity 300ms, transform 300ms';
+            note.style.transform = 'translateY(0)';
+
+            if (type === 'success') {
+                note.style.background = '#dcfce7';
+                note.style.border = '1px solid rgba(16,185,129,0.12)';
+            } else if (type === 'error') {
+                note.style.background = '#fee2e2';
+                note.style.border = '1px solid rgba(220,38,38,0.12)';
+            } else {
+                note.style.background = '#dbeafe';
+                note.style.border = '1px solid rgba(37,99,235,0.12)';
+            }
+
+            container.appendChild(note);
+
+            setTimeout(() => {
+                note.style.opacity = '0';
+                note.style.transform = 'translateY(-8px)';
+                setTimeout(() => note.remove(), 350);
+            }, timeout);
+        }
     </script>
 </body>
 </html>
