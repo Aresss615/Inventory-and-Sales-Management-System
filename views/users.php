@@ -94,27 +94,27 @@ $can_delete = hasPermission('users_delete');
 </div>
 
 <div id="userModal" class="modal">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content" style="max-width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
         <div class="modal-header">
             <h2 class="modal-title" id="userModalTitle">Add New User</h2>
             <button class="modal-close" onclick="closeUserModal()">&times;</button>
         </div>
-        <form id="userForm" method="POST" action="<?php echo API_URL; ?>/users.php">
-            <div style="padding: 20px;">
+        <form id="userForm" method="POST" action="<?php echo API_URL; ?>/users.php" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
                 <input type="hidden" name="id" id="userId">
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label for="userUsername">Username</label>
                     <input type="text" name="username" id="userUsername" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label for="userFullName">Full Name</label>
                     <input type="text" name="full_name" id="userFullName" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label for="userEmail">Email</label>
                     <input type="email" name="email" id="userEmail" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label for="userRole">Role</label>
                     <select name="role_id" id="userRole" required>
                         <?php
@@ -129,21 +129,41 @@ $can_delete = hasPermission('users_delete');
                         <?php endwhile; ?>
                     </select>
                 </div>
-                <div class="form-group" id="passwordGroup">
+                <div class="form-group" id="passwordGroup" style="margin-bottom: 16px;">
                     <label for="userPassword">Password</label>
                     <input type="password" name="password" id="userPassword" minlength="6">
                     <small style="color: #64748b;">Leave blank to keep current password (when editing)</small>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-bottom: 16px;">
                     <label>
                         <input type="checkbox" name="is_active" id="userActive" value="1" checked>
                         Active
                     </label>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="flex-shrink: 0;">
                 <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="deleteUserModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Delete User</h2>
+            <button class="modal-close" onclick="closeDeleteUserModal()">&times;</button>
+        </div>
+        <form method="POST" action="<?php echo API_URL; ?>/users.php">
+            <div style="padding: 20px;">
+                <p style="color: #64748b; margin-bottom: 0;">Are you sure you want to delete user "<strong id="deleteUserName"></strong>"? This action cannot be undone.</p>
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="id" id="deleteUserId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteUserModal()">Cancel</button>
+                <button type="submit" class="btn btn-delete">Delete</button>
             </div>
         </form>
     </div>
@@ -176,28 +196,13 @@ function closeUserModal() {
 }
 
 function deleteUser(id, username) {
-    if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
-        return;
-    }
-    
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '<?php echo API_URL; ?>/users.php';
-    
-    const idInput = document.createElement('input');
-    idInput.type = 'hidden';
-    idInput.name = 'id';
-    idInput.value = id;
-    
-    const actionInput = document.createElement('input');
-    actionInput.type = 'hidden';
-    actionInput.name = 'action';
-    actionInput.value = 'delete';
-    
-    form.appendChild(idInput);
-    form.appendChild(actionInput);
-    document.body.appendChild(form);
-    form.submit();
+    document.getElementById('deleteUserId').value = id;
+    document.getElementById('deleteUserName').textContent = username;
+    document.getElementById('deleteUserModal').style.display = 'flex';
+}
+
+function closeDeleteUserModal() {
+    document.getElementById('deleteUserModal').style.display = 'none';
 }
 
 window.onclick = function(event) {

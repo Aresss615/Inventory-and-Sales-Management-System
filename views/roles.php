@@ -112,23 +112,23 @@
             <input type="hidden" name="action" value="save">
             <input type="hidden" name="id" id="roleId">
             
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 16px;">
                 <label for="roleName">Role Name (lowercase, no spaces)</label>
                 <input type="text" name="name" id="roleName" pattern="[a-z_]+" required>
                 <small style="color: #64748b;">Example: cashier, stock_manager</small>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 16px;">
                 <label for="roleDisplayName">Display Name</label>
                 <input type="text" name="display_name" id="roleDisplayName" required>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 16px;">
                 <label for="roleDescription">Description</label>
                 <textarea name="description" id="roleDescription" rows="2"></textarea>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom: 16px;">
                 <label>Permissions</label>
                 <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
                     <?php
@@ -167,6 +167,26 @@
             <div class="modal-footer" style="flex-shrink: 0;">
                 <button type="button" class="btn btn-secondary" onclick="closeRoleModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Role</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="deleteRoleModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Delete Role</h2>
+            <button class="modal-close" onclick="closeDeleteRoleModal()">&times;</button>
+        </div>
+        <form method="POST" action="<?php echo API_URL; ?>/roles.php">
+            <div style="padding: 20px;">
+                <p style="color: #64748b; margin-bottom: 0;">Are you sure you want to delete the role "<strong id="deleteRoleName"></strong>"? This action cannot be undone.</p>
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="id" id="deleteRoleId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteRoleModal()">Cancel</button>
+                <button type="submit" class="btn btn-delete">Delete</button>
             </div>
         </form>
     </div>
@@ -235,26 +255,13 @@ function editRole(role) {
 }
 
 function deleteRole(id, name) {
-    if (confirm(`Are you sure you want to delete the role "${name}"?`)) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '<?php echo API_URL; ?>/roles.php';
-        
-        const actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = 'delete';
-        
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'id';
-        idInput.value = id;
-        
-        form.appendChild(actionInput);
-        form.appendChild(idInput);
-        document.body.appendChild(form);
-        form.submit();
-    }
+    document.getElementById('deleteRoleId').value = id;
+    document.getElementById('deleteRoleName').textContent = name;
+    document.getElementById('deleteRoleModal').style.display = 'flex';
+}
+
+function closeDeleteRoleModal() {
+    document.getElementById('deleteRoleModal').style.display = 'none';
 }
 
 function selectAllPermissions() {
@@ -268,13 +275,11 @@ function deselectAllPermissions() {
 function viewRolePermissions(role) {
     document.getElementById('viewPermissionsModal').style.display = 'flex';
     document.getElementById('viewPermissionsTitle').textContent = role.display_name + ' Permissions';
-    
     fetch('<?php echo API_URL; ?>/roles.php?action=get_permissions&role_id=' + role.id)
         .then(response => response.json())
         .then(permissionIds => {
             const content = document.getElementById('permissionsContent');
             content.innerHTML = '<p style="color: #64748b; margin-bottom: 16px;">' + role.description + '</p>';
-            
             <?php
             $permissions_result = mysqli_query($conn, "SELECT * FROM permissions ORDER BY module, display_name");
             $perms_by_module = [];
@@ -283,9 +288,7 @@ function viewRolePermissions(role) {
             }
             echo 'const allPermissions = ' . json_encode($perms_by_module) . ';';
             ?>
-            
             const permissionIdsStr = permissionIds.map(id => String(id));
-            
             for (const [module, perms] of Object.entries(allPermissions)) {
                 content.innerHTML += '<h4 style="color: #334155; margin-top: 16px; margin-bottom: 8px; text-transform: capitalize; font-size: 14px; font-weight: 600;">' + module + '</h4>';
                 content.innerHTML += '<div style="margin-bottom: 12px;">';
